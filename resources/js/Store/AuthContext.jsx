@@ -56,6 +56,10 @@ export function AuthProvider({ children }) {
                 setUser(null);
             }
             setAuthLoading(false);
+        }).catch((e) => {
+            console.error('SakuPintar: gagal membaca sesi dari Supabase.', e);
+            setUser(null);
+            setAuthLoading(false);
         });
 
         // Listen for Supabase auth state changes
