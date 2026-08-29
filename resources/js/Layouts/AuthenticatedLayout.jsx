@@ -9,7 +9,10 @@ export default function AuthenticatedLayout({ children }) {
     const location = useLocation();
     const navigate = useNavigate();
     const { user, logout } = useAuth();
-    const { getBudgetAlerts, resetData, recurringRules, savingsGoals } = useFinance();
+    const { 
+        getBudgetAlerts, resetData, recurringRules, savingsGoals, 
+        invitations, acceptSavingsGoalInvitation, rejectSavingsGoalInvitation 
+    } = useFinance();
     const [searchTerm, setSearchTerm] = useState('');
     const [notifOpen, setNotifOpen] = useState(false);
 
@@ -85,6 +88,15 @@ export default function AuthenticatedLayout({ children }) {
     const allNotifications = useMemo(() => {
         return [...budgetAlertList, ...billAlertList, ...savingAlertList];
     }, [budgetAlertList, billAlertList, savingAlertList]);
+
+    const pendingInvites = useMemo(() => {
+        if (!invitations || !user) return [];
+        return invitations.filter(
+            (inv) => inv.status === 'pending' && inv.inviteeEmail.toLowerCase() === user.email.toLowerCase()
+        );
+    }, [invitations, user]);
+
+    const totalNotifCount = allNotifications.length + pendingInvites.length;
 
     const isActive = (path) => location.pathname === path;
     
@@ -228,14 +240,14 @@ export default function AuthenticatedLayout({ children }) {
                 <div className="flex items-center gap-4 relative">
                     <button
                         onClick={() => setNotifOpen((v) => !v)}
-                        className={`p-2.5 rounded-xl hover:bg-slate-50 transition-colors relative ${allNotifications.length > 0 ? 'text-emerald-800' : 'text-slate-500'}`}
+                        className={`p-2.5 rounded-xl hover:bg-slate-50 transition-colors relative ${totalNotifCount > 0 ? 'text-emerald-800' : 'text-slate-500'}`}
                     >
                         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                         </svg>
-                        {allNotifications.length > 0 && (
-                            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
-                                {allNotifications.length}
+                        {totalNotifCount > 0 && (
+                            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white animate-pulse">
+                                {totalNotifCount}
                             </span>
                         )}
                     </button>
@@ -248,7 +260,43 @@ export default function AuthenticatedLayout({ children }) {
                                     <p className="font-bold text-sm text-slate-800">Pusat Pemberitahuan</p>
                                     <p className="text-xs text-slate-500 font-medium">Informasi & peringatan keuangan Anda</p>
                                 </div>
-                                {allNotifications.length === 0 ? (
+
+                                {/* Shared Goal Collaboration Invitations */}
+                                {pendingInvites.length > 0 && (
+                                    <div className="bg-emerald-50/40 p-4 border-b border-stone-200 flex flex-col gap-3">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                            </svg>
+                                            Undangan Kolaborasi ({pendingInvites.length})
+                                        </div>
+                                        <div className="flex flex-col gap-3">
+                                            {pendingInvites.map((inv) => (
+                                                <div key={inv.id} className="bg-white rounded-xl border border-stone-200 p-3 shadow-sm flex flex-col gap-2.5">
+                                                    <p className="text-xs text-slate-700 leading-normal">
+                                                        <strong className="font-bold text-slate-900">{inv.inviterName}</strong> ({inv.inviterEmail}) mengundang Anda mengelola target bersama <strong>"{inv.goalTitle}"</strong>.
+                                                    </p>
+                                                    <div className="flex gap-2 justify-end">
+                                                        <button
+                                                            onClick={() => rejectSavingsGoalInvitation(inv.id)}
+                                                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-bold transition-colors"
+                                                        >
+                                                            Tolak
+                                                        </button>
+                                                        <button
+                                                            onClick={() => acceptSavingsGoalInvitation(inv.id)}
+                                                            className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold transition-colors"
+                                                        >
+                                                            Terima
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {allNotifications.length === 0 && pendingInvites.length === 0 ? (
                                     <div className="px-4 py-8 text-center flex flex-col items-center justify-center gap-2">
                                         <svg className="w-8 h-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />

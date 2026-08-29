@@ -136,6 +136,17 @@ const seedState = () => ({
     budgets: { ...seedBudgets },
     recurringRules: buildSeedRules(),
     savingsGoals: buildSeedSavingsGoals(),
+    invitations: [
+        {
+            id: 'mock-inv-1',
+            goalId: 'mock-goal-1',
+            inviterName: 'Kekasih',
+            inviterEmail: 'pasangan@sakupintar.id',
+            inviteeEmail: 'demo@sakupintar.id',
+            goalTitle: 'Dana Pernikahan Bersama',
+            status: 'pending'
+        }
+    ]
 });
 
 const isValidState = (s) =>
@@ -196,6 +207,7 @@ const loadInitialState = () => {
                         ...g,
                         history: Array.isArray(g.history) ? g.history : (g.current > 0 ? [{ id: uid(), date: todayISO(), amount: g.current, note: 'Saldo Awal' }] : [])
                     })),
+                    invitations: Array.isArray(parsed.invitations) ? parsed.invitations : seedState().invitations
                 };
             }
         }
@@ -208,7 +220,7 @@ const loadInitialState = () => {
 export function FinanceProvider({ children }) {
     const [state, setState] = useState(loadInitialState);
     const { user } = useAuth();
-    const { wallets, categories, transactions, budgets, recurringRules, savingsGoals } = state;
+    const { wallets, categories, transactions, budgets, recurringRules, savingsGoals, invitations = [] } = state;
 
     // ─── LocalStorage Fallback Backup ───
     useEffect(() => {
@@ -234,13 +246,15 @@ export function FinanceProvider({ children }) {
                 { data: txnsData },
                 { data: budgetsData },
                 { data: savingsData },
-                { data: rulesData }
+                { data: rulesData },
+                { data: invsData }
             ] = await Promise.all([
                 supabase.from('wallets').select('*').eq('user_id', userId),
                 supabase.from('transactions').select('*').eq('user_id', userId),
                 supabase.from('category_budgets').select('*').eq('user_id', userId),
                 supabase.from('savings_goals').select('*').eq('user_id', userId),
-                supabase.from('recurring_rules').select('*').eq('user_id', userId)
+                supabase.from('recurring_rules').select('*').eq('user_id', userId),
+                supabase.from('savings_goal_invitations').select('*').eq('invitee_email', user.email.toLowerCase())
             ]);
 
             const budgetsObj = {};
@@ -286,7 +300,18 @@ export function FinanceProvider({ children }) {
                     target: Number(g.target),
                     current: Number(g.current),
                     deadlineISO: g.deadline_iso,
-                    history: g.history || []
+                    history: g.history || [],
+                    isShared: g.is_shared,
+                    partnerEmail: g.partner_email
+                })) : [],
+                invitations: invsData ? invsData.map(inv => ({
+                    id: inv.id,
+                    goalId: inv.goal_id,
+                    inviterName: inv.inviter_name,
+                    inviterEmail: inv.inviter_email,
+                    inviteeEmail: inv.invitee_email,
+                    goalTitle: inv.goal_title,
+                    status: inv.status
                 })) : []
             });
         };
@@ -629,16 +654,108 @@ export function FinanceProvider({ children }) {
 
     const updateSavingsGoalSharing = useCallback(async (goalId, partnerEmail) => {
         const isShared = !!partnerEmail;
-        setState((s) => ({
+        
+        // If stopping collaboration
+        if (!isShared) {
+            setState((s) => ({
+                ...s,
+                savingsGoals: s.savingsGoals.map((g) => (g.id === goalId ? { ...g, isShared: false, partnerEmail: null } : g))
+            }));
+            
+            if (isSupabaseConfigured && user) {
+                await supabase.from('savings_goals').update({ is_shared: false, partner_email: null }).eq('id', goalId);
+                await supabase.from('savings_goal_invitations').delete().eq('goal_id', goalId);
+            }
+            return;
+        }
+
+        // Send an invitation
+        const newInv = {
+            id: uid(),
+            goalId,
+            inviterName: user ? user.name : 'Pasangan',
+            inviterEmail: user ? user.email : 'pasangan@email.com',
+            inviteeEmail: partnerEmail.trim().toLowerCase(),
+            goalTitle: savingsGoals.find(g => g.id === goalId)?.title || 'Target Bersama',
+            status: 'pending'
+        };
+
+        setState(s => ({
             ...s,
-            savingsGoals: s.savingsGoals.map((g) => (g.id === goalId ? { ...g, isShared, partnerEmail } : g))
+            invitations: [...(s.invitations || []), newInv]
         }));
 
         if (isSupabaseConfigured && user) {
-            await supabase.from('savings_goals').update({
-                isShared,
-                partnerEmail
-            }).eq('id', goalId);
+            await supabase.from('savings_goal_invitations').insert([{
+                id: newInv.id,
+                goal_id: newInv.goalId,
+                inviter_name: newInv.inviterName,
+                inviter_email: newInv.inviterEmail,
+                invitee_email: newInv.inviteeEmail,
+                goal_title: newInv.goalTitle,
+                status: 'pending'
+            }]);
+        }
+    }, [user, savingsGoals]);
+
+    const acceptSavingsGoalInvitation = useCallback(async (invitationId) => {
+        let invitation = null;
+        
+        setState(s => {
+            invitation = (s.invitations || []).find(inv => inv.id === invitationId);
+            if (!invitation) return s;
+
+            // Remove/accept the invitation in the local list
+            const invitationsNext = (s.invitations || []).map(inv => 
+                inv.id === invitationId ? { ...inv, status: 'accepted' } : inv
+            );
+
+            // In local storage, duplicate the shared goal into the invitee's list!
+            const alreadyExists = s.savingsGoals.some(g => g.id === invitation.goalId);
+            if (alreadyExists) return { ...s, invitations: invitationsNext };
+
+            // Create a mock local shared goal
+            const newGoal = {
+                id: invitation.goalId,
+                title: invitation.goalTitle,
+                target: 100000000, // mock target values
+                current: 25000000,
+                deadlineISO: todayISO(),
+                history: [
+                    { id: uid(), date: todayISO(), amount: 25000000, note: 'Saldo Awal Mulai Bersama', senderName: invitation.inviterName }
+                ],
+                isShared: true,
+                partnerEmail: invitation.inviterEmail
+            };
+
+            return {
+                ...s,
+                invitations: invitationsNext,
+                savingsGoals: [...s.savingsGoals, newGoal]
+            };
+        });
+
+        if (isSupabaseConfigured && user) {
+            await supabase.from('savings_goal_invitations').update({ status: 'accepted' }).eq('id', invitationId);
+            // Insert partner link in collaborators table
+            const { data: inv } = await supabase.from('savings_goal_invitations').select('*').eq('id', invitationId).single();
+            if (inv) {
+                await supabase.from('savings_goal_collaborators').insert([{
+                    savings_goal_id: inv.goal_id,
+                    user_id: user.id
+                }]);
+            }
+        }
+    }, [user]);
+
+    const rejectSavingsGoalInvitation = useCallback(async (invitationId) => {
+        setState(s => ({
+            ...s,
+            invitations: (s.invitations || []).filter(inv => inv.id !== invitationId)
+        }));
+
+        if (isSupabaseConfigured && user) {
+            await supabase.from('savings_goal_invitations').delete().eq('id', invitationId);
         }
     }, [user]);
 
@@ -650,6 +767,7 @@ export function FinanceProvider({ children }) {
             await supabase.from('category_budgets').delete().eq('user_id', userId);
             await supabase.from('savings_goals').delete().eq('user_id', userId);
             await supabase.from('recurring_rules').delete().eq('user_id', userId);
+            await supabase.from('savings_goal_invitations').delete().or(`inviter_email.eq.${user.email},invitee_email.eq.${user.email}`);
         }
 
         localStorage.removeItem(STORAGE_KEY);
@@ -716,6 +834,7 @@ export function FinanceProvider({ children }) {
         budgets,
         recurringRules,
         savingsGoals,
+        invitations,
         categoryById,
         walletById,
         addTransaction,
@@ -737,6 +856,8 @@ export function FinanceProvider({ children }) {
         addSavingsGoalDeposit,
         deleteSavingsGoalDeposit,
         updateSavingsGoalSharing,
+        acceptSavingsGoalInvitation,
+        rejectSavingsGoalInvitation,
         resetData,
         getWalletBalance,
         totalBalance,
@@ -745,12 +866,13 @@ export function FinanceProvider({ children }) {
         getCategoryMonthCount,
         getBudgetAlerts,
     }), [
-        wallets, categories, sortedTransactions, budgets, recurringRules, savingsGoals, categoryById, walletById,
+        wallets, categories, sortedTransactions, budgets, recurringRules, savingsGoals, invitations, categoryById, walletById,
         addTransaction, updateTransaction, deleteTransaction, addTransfer,
         addWallet, updateWallet, deleteWallet,
         addCategory, updateCategory, deleteCategory, setBudget,
         addRecurringRule, toggleRecurringRule, deleteRecurringRule,
-        addSavingsGoal, deleteSavingsGoal, addSavingsGoalDeposit, deleteSavingsGoalDeposit, updateSavingsGoalSharing, resetData,
+        addSavingsGoal, deleteSavingsGoal, addSavingsGoalDeposit, deleteSavingsGoalDeposit,
+        updateSavingsGoalSharing, acceptSavingsGoalInvitation, rejectSavingsGoalInvitation, resetData,
         getWalletBalance, totalBalance, monthStats, getCategoryMonthSpend, getCategoryMonthCount, getBudgetAlerts,
     ]);
 
