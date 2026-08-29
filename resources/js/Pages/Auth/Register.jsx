@@ -126,7 +126,7 @@ function PasswordField({
 
 export default function Register() {
   const navigate = useNavigate();
-  const { register, login, demo } = useAuth();
+  const { register, login, loginWithGoogle, demo } = useAuth();
   const formId = useId();
   const fullNameId = `${formId}-fullname`;
   const emailId = `${formId}-email`;
@@ -159,6 +159,14 @@ export default function Register() {
       return;
     }
     navigate("/dashboard", { replace: true });
+  };
+
+  const handleGoogleLogin = async () => {
+    setError("");
+    const res = await loginWithGoogle();
+    if (!res.ok) {
+      setError(res.error);
+    }
   };
 
   const handleDemoLogin = async () => {
@@ -302,8 +310,8 @@ export default function Register() {
             {/* Google OAuth Button */}
             <button
               type="button"
-              onClick={handleDemoLogin}
-              title="Masuk cepat dengan akun demo"
+              onClick={handleGoogleLogin}
+              title="Daftar dengan akun Google"
               className="flex-1 py-0 inline-flex h-12 items-center justify-center gap-3 relative bg-[#f7faf5] hover:bg-[#f1f5ee] rounded-xl border border-solid border-[#bec9c0] cursor-pointer transition-colors duration-150 active:scale-[0.98]"
               aria-label="Continue with Google"
             >

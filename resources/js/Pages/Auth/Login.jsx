@@ -5,12 +5,20 @@ import { useAuth } from '../../Store/AuthContext';
 
 export default function Login() {
     const navigate = useNavigate();
-    const { login, demo } = useAuth();
+    const { login, loginWithGoogle, demo } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const handleGoogleLogin = async () => {
+        setError('');
+        const res = await loginWithGoogle();
+        if (!res.ok) {
+            setError(res.error);
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -227,8 +235,8 @@ export default function Login() {
                     {/* Google Button */}
                     <button
                         type="button"
-                        onClick={handleDemoLogin}
-                        title="Masuk cepat dengan akun demo"
+                        onClick={handleGoogleLogin}
+                        title="Masuk dengan akun Google"
                         className="flex-1 px-4 py-0 inline-flex h-12 items-center justify-center gap-3 relative bg-[#f7faf5] hover:bg-stone-100 transition-colors rounded-xl border border-solid border-[#bec9c0] active:scale-[0.98]"
                         aria-label="Continue with Google"
                     >

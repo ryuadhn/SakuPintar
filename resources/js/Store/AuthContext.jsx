@@ -141,6 +141,28 @@ export function AuthProvider({ children }) {
         return { ok: true };
     }, []);
 
+    const loginWithGoogle = useCallback(async () => {
+        if (!isSupabaseConfigured) {
+            const session = { name: 'Demo User', email: DEMO_EMAIL, id: 'local-user' };
+            localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+            setUser(session);
+            return { ok: true };
+        }
+
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: window.location.origin + '/dashboard'
+            }
+        });
+
+        if (error) {
+            return { ok: false, error: error.message };
+        }
+
+        return { ok: true };
+    }, []);
+
     const logout = useCallback(async () => {
         if (!isSupabaseConfigured) {
             localStorage.removeItem(SESSION_KEY);
@@ -156,10 +178,11 @@ export function AuthProvider({ children }) {
         user,
         login,
         register,
+        loginWithGoogle,
         logout,
         authLoading,
         demo: { email: DEMO_EMAIL, password: DEMO_PASS },
-    }), [user, login, register, logout, authLoading]);
+    }), [user, login, register, loginWithGoogle, logout, authLoading]);
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
