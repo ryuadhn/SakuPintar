@@ -93,10 +93,43 @@ function GoalCard({ goal, onDelete, onClick }) {
 
 // ─── Component: GrowthChart ──────────────────────────────────────────────────
 function GrowthChart() {
+    const [hoveredIdx, setHoveredIdx] = useState(null);
+    const chartW = 550;
     const chartH = 180;
 
+    // Calculate coordinates
+    const points = useMemo(() => {
+        return months.map((m, i) => {
+            const x = (i / 11) * (chartW - 40) + 20;
+            const yProj = chartH - (projection[i] / maxVal) * (chartH - 45) - 25;
+            const yColl = collected[i] > 0 
+                ? chartH - (collected[i] / maxVal) * (chartH - 45) - 25 
+                : null;
+            return { x, yProj, yColl, month: m, collVal: collected[i], projVal: projection[i] };
+        });
+    }, []);
+
+    // Generate Path strings
+    const projPathD = useMemo(() => {
+        return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yProj}`).join(' ');
+    }, [points]);
+
+    const collPathD = useMemo(() => {
+        const activePoints = points.filter(p => p.yColl !== null);
+        return activePoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yColl}`).join(' ');
+    }, [points]);
+
+    const collAreaD = useMemo(() => {
+        const activePoints = points.filter(p => p.yColl !== null);
+        if (activePoints.length === 0) return '';
+        const first = activePoints[0];
+        const last = activePoints[activePoints.length - 1];
+        const lineParts = activePoints.map(p => `L ${p.x} ${p.yColl}`).join(' ');
+        return `M ${first.x} ${chartH - 20} L ${first.x} ${first.yColl} ${lineParts} L ${last.x} ${chartH - 20} Z`;
+    }, [points]);
+
     return (
-        <div className="w-full bg-white rounded-3xl outline outline-1 outline-offset-[-1px] outline-stone-300 p-8 flex flex-col gap-6 h-full">
+        <div className="w-full bg-white rounded-3xl outline outline-1 outline-offset-[-1px] outline-stone-300 p-8 flex flex-col gap-6 h-full relative">
             {/* Header */}
             <div className="flex justify-between items-center flex-wrap gap-4">
                 <div>
@@ -105,53 +138,143 @@ function GrowthChart() {
                 </div>
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full bg-emerald-800" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-800" />
                         <span className="text-neutral-700 text-[10px] font-bold uppercase tracking-wider">TERKUMPUL</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full bg-stone-200" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-stone-200 border border-stone-300" />
                         <span className="text-neutral-700 text-[10px] font-bold uppercase tracking-wider">PROYEKSI</span>
                     </div>
                 </div>
             </div>
 
-            {/* Bar Chart */}
-            <div className="w-full flex-1" style={{ minHeight: chartH + 32 }}>
-                <div className="flex items-end justify-between gap-2 h-full" style={{ height: chartH + 32 }}>
-                    {months.map((m, i) => {
-                        const colH = projection[i] > 0 ? (projection[i] / maxVal) * chartH : 0;
-                        const collH = collected[i] > 0 ? (collected[i] / maxVal) * chartH : 0;
-                        const isProjection = collected[i] === 0 && projection[i] > 0;
+            {/* SVG Line Chart */}
+            <div className="w-full flex-1 relative min-h-[200px] flex items-center justify-center">
+                <div className="w-full relative">
+                    <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full h-full overflow-visible">
+                        <defs>
+                            <linearGradient id="coll-grad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#0E6C4A" stopOpacity="0.25" />
+                                <stop offset="100%" stopColor="#0E6C4A" stopOpacity="0.0" />
+                            </linearGradient>
+                        </defs>
 
+                        {/* Horizontal Guide Lines */}
+                        {[0, 0.25, 0.5, 0.75, 1].map((val, idx) => {
+                            const y = 15 + val * (chartH - 45);
+                            return (
+                                <line 
+                                    key={idx} 
+                                    x1="20" y1={y} x2={chartW - 20} y2={y} 
+                                    stroke="#f5f5f4" strokeWidth="1.5" 
+                                />
+                            );
+                        })}
+
+                        {/* Projection Path (Light Gray, Dashed) */}
+                        <path 
+                            d={projPathD} 
+                            fill="none" 
+                            stroke="#d6d3d1" 
+                            strokeWidth="2.5" 
+                            strokeDasharray="5 5" 
+                        />
+
+                        {/* Collected Area (Gradient) */}
+                        <path 
+                            d={collAreaD} 
+                            fill="url(#coll-grad)" 
+                        />
+
+                        {/* Collected Path (Solid Emerald) */}
+                        <path 
+                            d={collPathD} 
+                            fill="none" 
+                            stroke="#0E6C4A" 
+                            strokeWidth="3.5" 
+                        />
+
+                        {/* Current point (Ags) highlight dot */}
+                        {points.filter(p => p.yColl !== null).length > 0 && (() => {
+                            const activeList = points.filter(p => p.yColl !== null);
+                            const curPoint = activeList[activeList.length - 1];
+                            return (
+                                <g>
+                                    <circle 
+                                        cx={curPoint.x} cx-id="outer" cy={curPoint.yColl} r="10" 
+                                        fill="#0E6C4A" fillOpacity="0.15" 
+                                    />
+                                    <circle 
+                                        cx={curPoint.x} cx-id="inner" cy={curPoint.yColl} r="5" 
+                                        fill="#0E6C4A" 
+                                        stroke="white" strokeWidth="2"
+                                    />
+                                </g>
+                            );
+                        })()}
+
+                        {/* Hover tooltip dots */}
+                        {hoveredIdx !== null && (
+                            <g>
+                                <circle 
+                                    cx={points[hoveredIdx].x} 
+                                    cy={points[hoveredIdx].yColl !== null ? points[hoveredIdx].yColl : points[hoveredIdx].yProj} 
+                                    r="6" 
+                                    fill={points[hoveredIdx].yColl !== null ? '#0E6C4A' : '#78716c'} 
+                                    stroke="white" strokeWidth="2"
+                                />
+                            </g>
+                        )}
+
+                        {/* X-Axis labels */}
+                        {points.map((p, i) => (
+                            <text 
+                                key={i} 
+                                x={p.x} y={chartH - 2} 
+                                textAnchor="middle" 
+                                className="text-[11px] font-medium fill-stone-500"
+                            >
+                                {p.month}
+                            </text>
+                        ))}
+
+                        {/* Transparent hover triggers */}
+                        {points.map((p, i) => (
+                            <rect 
+                                key={i}
+                                x={p.x - 20} y="0" 
+                                width="40" height={chartH} 
+                                fill="transparent" 
+                                className="cursor-pointer"
+                                onMouseEnter={() => setHoveredIdx(i)}
+                                onMouseLeave={() => setHoveredIdx(null)}
+                            />
+                        ))}
+                    </svg>
+
+                    {/* Floating Interactive Tooltip */}
+                    {hoveredIdx !== null && (() => {
+                        const activeP = points[hoveredIdx];
+                        const isColl = activeP.yColl !== null;
+                        const val = isColl ? activeP.collVal : activeP.projVal;
+                        const displayVal = fmtIDR(val * 1000000); 
+                        
                         return (
-                            <div key={m} className="flex-1 flex flex-col items-center gap-1.5" style={{ height: chartH + 32 }}>
-                                <div className="flex-1 flex items-end w-full">
-                                    {colH > 0 || projection[i] > 0 ? (
-                                        <div className="relative w-full rounded-t-lg overflow-hidden" style={{ height: colH || 4 }}>
-                                            {projection[i] > 0 && (
-                                                <div
-                                                    className="absolute bottom-0 left-0 right-0 bg-stone-200 rounded-t-lg"
-                                                    style={{ height: '100%' }}
-                                                />
-                                            )}
-                                            {collH > 0 && (
-                                                <div
-                                                    className="absolute bottom-0 left-0 right-0 bg-emerald-800 rounded-t-lg"
-                                                    style={{ height: `${(collH / colH) * 100}%` }}
-                                                />
-                                            )}
-                                            {isProjection && (
-                                                <div className="absolute top-0 left-0 right-0 h-1 border-t-4 border-emerald-800" />
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="w-full h-1" />
-                                    )}
-                                </div>
-                                <span className="text-neutral-700 text-xs font-normal leading-4">{m}</span>
+                            <div 
+                                className="absolute bg-stone-900 text-white text-[11px] font-semibold px-3 py-1.5 rounded-xl shadow-lg pointer-events-none flex flex-col gap-0.5 border border-stone-800 z-30"
+                                style={{ 
+                                    left: `${(activeP.x / chartW) * 100}%`,
+                                    transform: 'translateX(-50%)',
+                                    bottom: `${((chartH - (isColl ? activeP.yColl : activeP.yProj)) / chartH) * 100 + 4}%`
+                                }}
+                            >
+                                <span className="text-[9px] uppercase tracking-wider text-stone-400">
+                                    {isColl ? 'Terkumpul' : 'Proyeksi'} ({activeP.month})
+                                </span>
+                                <span>{displayVal}</span>
                             </div>
                         );
-                    })}
+                    })()}
                 </div>
             </div>
         </div>
