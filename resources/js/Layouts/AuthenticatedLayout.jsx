@@ -111,7 +111,7 @@ export default function AuthenticatedLayout({ children }) {
     return (
         <div className="h-screen bg-[#F7FAF5] flex overflow-hidden">
             {/* Sidebar Kiri */}
-            <aside className="w-20 lg:w-64 bg-white text-slate-700 flex flex-col justify-between p-4 lg:p-6 hidden md:flex border-r border-[#bec9c0] transition-all duration-300">
+            <aside className="w-20 lg:w-64 bg-white text-slate-700 flex flex-col justify-between p-4 lg:p-6 hidden sm:flex border-r border-[#bec9c0] transition-all duration-300">
                 <div className="space-y-8">
                     {/* Brand */}
                     <div className="flex items-center justify-center lg:justify-start gap-2.5 px-2">
