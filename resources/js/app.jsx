@@ -19,7 +19,8 @@ import BillsCalendar from './Pages/BillsCalendar';
 
 function ProtectedRoute({ children }) {
   const { user, authLoading } = useAuth();
-  if (authLoading) {
+  const hasHash = window.location.hash.includes('access_token') || window.location.hash.includes('type=recovery') || window.location.search.includes('code=');
+  if (authLoading || hasHash) {
     return (
       <div className="h-screen w-screen flex justify-center items-center bg-[#F7FAF5]">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#0e6c4a] border-t-transparent"></div>
@@ -32,7 +33,8 @@ function ProtectedRoute({ children }) {
 
 function GuestRoute({ children }) {
   const { user, authLoading } = useAuth();
-  if (authLoading) {
+  const hasHash = window.location.hash.includes('access_token') || window.location.hash.includes('type=recovery') || window.location.search.includes('code=');
+  if (authLoading || hasHash) {
     return (
       <div className="h-screen w-screen flex justify-center items-center bg-[#F7FAF5]">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#0e6c4a] border-t-transparent"></div>
@@ -43,14 +45,28 @@ function GuestRoute({ children }) {
   return children;
 }
 
+function RootRoute() {
+  const { user, authLoading } = useAuth();
+  const hasHash = window.location.hash.includes('access_token') || window.location.hash.includes('type=recovery') || window.location.search.includes('code=');
+  if (authLoading || hasHash) {
+    return (
+      <div className="h-screen w-screen flex justify-center items-center bg-[#F7FAF5]">
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#0e6c4a] border-t-transparent"></div>
+      </div>
+    );
+  }
+  if (user) return <Navigate to="/dashboard" replace />;
+  return <Navigate to="/login" replace />;
+}
+
 function App() {
   return (
     <AuthProvider>
       <FinanceProvider>
         <BrowserRouter>
           <Routes>
-            {/* Default Route redirects to Login */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            {/* Default Route */}
+            <Route path="/" element={<RootRoute />} />
 
             {/* Auth Routes */}
             <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
@@ -67,7 +83,7 @@ function App() {
             <Route path="/calendar" element={<ProtectedRoute><BillsCalendar /></ProtectedRoute>} />
 
             {/* Fallback route */}
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<RootRoute />} />
           </Routes>
         </BrowserRouter>
       </FinanceProvider>
