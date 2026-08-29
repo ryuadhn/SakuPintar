@@ -18,13 +18,27 @@ import FinancialPlanner from './Pages/FinancialPlanner';
 import BillsCalendar from './Pages/BillsCalendar';
 
 function ProtectedRoute({ children }) {
-  const { user } = useAuth();
+  const { user, authLoading } = useAuth();
+  if (authLoading) {
+    return (
+      <div className="h-screen w-screen flex justify-center items-center bg-[#F7FAF5]">
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#0e6c4a] border-t-transparent"></div>
+      </div>
+    );
+  }
   if (!user) return <Navigate to="/login" replace />;
   return children;
 }
 
 function GuestRoute({ children }) {
-  const { user } = useAuth();
+  const { user, authLoading } = useAuth();
+  if (authLoading) {
+    return (
+      <div className="h-screen w-screen flex justify-center items-center bg-[#F7FAF5]">
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#0e6c4a] border-t-transparent"></div>
+      </div>
+    );
+  }
   if (user) return <Navigate to="/dashboard" replace />;
   return children;
 }
