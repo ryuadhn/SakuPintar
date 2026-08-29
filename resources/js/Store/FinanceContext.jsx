@@ -627,6 +627,21 @@ export function FinanceProvider({ children }) {
         }
     }, [user]);
 
+    const updateSavingsGoalSharing = useCallback(async (goalId, partnerEmail) => {
+        const isShared = !!partnerEmail;
+        setState((s) => ({
+            ...s,
+            savingsGoals: s.savingsGoals.map((g) => (g.id === goalId ? { ...g, isShared, partnerEmail } : g))
+        }));
+
+        if (isSupabaseConfigured && user) {
+            await supabase.from('savings_goals').update({
+                isShared,
+                partnerEmail
+            }).eq('id', goalId);
+        }
+    }, [user]);
+
     const resetData = useCallback(async () => {
         if (isSupabaseConfigured && user) {
             const userId = user.id;
@@ -721,6 +736,7 @@ export function FinanceProvider({ children }) {
         deleteSavingsGoal,
         addSavingsGoalDeposit,
         deleteSavingsGoalDeposit,
+        updateSavingsGoalSharing,
         resetData,
         getWalletBalance,
         totalBalance,
@@ -734,7 +750,7 @@ export function FinanceProvider({ children }) {
         addWallet, updateWallet, deleteWallet,
         addCategory, updateCategory, deleteCategory, setBudget,
         addRecurringRule, toggleRecurringRule, deleteRecurringRule,
-        addSavingsGoal, deleteSavingsGoal, addSavingsGoalDeposit, deleteSavingsGoalDeposit, resetData,
+        addSavingsGoal, deleteSavingsGoal, addSavingsGoalDeposit, deleteSavingsGoalDeposit, updateSavingsGoalSharing, resetData,
         getWalletBalance, totalBalance, monthStats, getCategoryMonthSpend, getCategoryMonthCount, getBudgetAlerts,
     ]);
 

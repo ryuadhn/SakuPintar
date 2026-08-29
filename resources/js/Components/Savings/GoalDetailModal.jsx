@@ -4,11 +4,13 @@ import Modal from '../UI/Modal';
 import Input from '../UI/Input';
 import Button from '../UI/Button';
 import { useFinance } from '../../Store/FinanceContext';
+import { useAuth } from '../../Store/AuthContext';
 import { GOAL_ICONS } from './GoalModal';
 import { fmtIDR, formatDateID, todayISO } from '../../Utils/format';
 
 export default function GoalDetailModal({ goal, isOpen, onClose }) {
     const { addSavingsGoalDeposit, deleteSavingsGoalDeposit } = useFinance();
+    const { user } = useAuth();
 
     const [type, setType] = useState('deposit'); // 'deposit' or 'withdraw'
     const [amount, setAmount] = useState('');
@@ -45,6 +47,7 @@ export default function GoalDetailModal({ goal, isOpen, onClose }) {
             amount: signedAmount,
             date: date || todayISO(),
             note: note.trim() || defaultNote,
+            senderName: user ? user.name : 'Anda',
         });
 
         // Reset form
@@ -243,7 +246,7 @@ export default function GoalDetailModal({ goal, isOpen, onClose }) {
                                                 <div className="min-w-0">
                                                     <p className="font-bold text-slate-800 truncate">{log.note}</p>
                                                     <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                                                        {formatDateID(log.date)}
+                                                        {formatDateID(log.date)}{log.senderName ? ` • oleh ${log.senderName}` : ''}
                                                     </p>
                                                 </div>
                                             </div>

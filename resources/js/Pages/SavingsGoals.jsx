@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import GoalModal, { GOAL_ICONS } from '../Components/Savings/GoalModal';
 import GoalDetailModal from '../Components/Savings/GoalDetailModal';
+import CollaborateModal from '../Components/Savings/CollaborateModal';
 import { useFinance } from '../Store/FinanceContext';
 import { fmtIDR, formatMonthYear, monthsUntil } from '../Utils/format';
 
@@ -12,7 +13,7 @@ const projection = [10, 22, 35, 50, 65, 78, 92, 108, 120, 135, 148, 145];
 const maxVal = 165;
 
 // ─── Component: GoalCard ─────────────────────────────────────────────────────
-function GoalCard({ goal, onDelete, onClick }) {
+function GoalCard({ goal, onDelete, onClick, onCollaborate }) {
     const isDone = goal.progress >= 100;
 
     return (
@@ -30,9 +31,16 @@ function GoalCard({ goal, onDelete, onClick }) {
                         })()}
                     </div>
                     <div className="flex flex-col min-w-0">
-                        <h4 className="text-zinc-900 text-lg font-bold leading-6 truncate">{goal.title}</h4>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <h4 className="text-zinc-900 text-lg font-bold leading-6 truncate">{goal.title}</h4>
+                            {goal.isShared && (
+                                <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/50 rounded text-[9px] font-bold uppercase tracking-wider shrink-0">
+                                    Bersama
+                                </span>
+                            )}
+                        </div>
                         <span className="text-neutral-700 text-xs font-normal leading-4 mt-0.5">
-                            Target Selesai: {goal.deadlineLabel}
+                            Target Selesai: {goal.deadlineLabel} {goal.partnerEmail ? `• ${goal.partnerEmail}` : ''}
                         </span>
                     </div>
                 </div>
@@ -41,9 +49,23 @@ function GoalCard({ goal, onDelete, onClick }) {
                         Selesai
                     </span>
                 ) : (
-                    <div className="flex flex-col items-end shrink-0">
-                        <span className="text-neutral-700 text-[10px] font-bold uppercase leading-4 tracking-wider">Progres</span>
-                        <span className="text-emerald-800 text-2xl font-bold leading-8">{goal.progress}%</span>
+                    <div className="flex items-center gap-3 shrink-0">
+                        <button
+                            onClick={(e) => { 
+                                e.stopPropagation(); 
+                                onCollaborate(goal); 
+                            }}
+                            className="p-2 rounded-lg text-stone-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                            title="Kelola Kolaborasi Target"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                            </svg>
+                        </button>
+                        <div className="flex flex-col items-end shrink-0">
+                            <span className="text-neutral-700 text-[10px] font-bold uppercase leading-4 tracking-wider">Progres</span>
+                            <span className="text-emerald-800 text-2xl font-bold leading-8">{goal.progress}%</span>
+                        </div>
                     </div>
                 )}
             </div>
@@ -320,12 +342,13 @@ function BestPerformer() {
 const SORT_OPTIONS = ['Tenggat Waktu', 'Progres', 'Jumlah Target'];
 
 export default function SavingsGoals() {
-    const { savingsGoals, deleteSavingsGoal } = useFinance();
+    const { savingsGoals, deleteSavingsGoal, updateSavingsGoalSharing } = useFinance();
     const [activeTab, setActiveTab] = useState('berjalan');
     const [sortBy, setSortBy] = useState('Tenggat Waktu');
     const [sortOpen, setSortOpen] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedGoalId, setSelectedGoalId] = useState(null);
+    const [collabGoal, setCollabGoal] = useState(null);
 
     useEffect(() => {
         if (!sortOpen) return;
@@ -529,7 +552,13 @@ export default function SavingsGoals() {
                     ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {sortedGoals.map((g) => (
-                                <GoalCard key={g.id} goal={g} onDelete={deleteSavingsGoal} onClick={() => setSelectedGoalId(g.id)} />
+                                <GoalCard 
+                                    key={g.id} 
+                                    goal={g} 
+                                    onDelete={deleteSavingsGoal} 
+                                    onClick={() => setSelectedGoalId(g.id)} 
+                                    onCollaborate={(goal) => setCollabGoal(goal)}
+                                />
                             ))}
                         </div>
                     )}
@@ -555,6 +584,14 @@ export default function SavingsGoals() {
                 goal={selectedGoal} 
                 isOpen={!!selectedGoalId} 
                 onClose={() => setSelectedGoalId(null)} 
+            />
+
+            {/* Collaborate Modal */}
+            <CollaborateModal
+                isOpen={!!collabGoal}
+                onClose={() => setCollabGoal(null)}
+                goal={collabGoal}
+                onSave={updateSavingsGoalSharing}
             />
         </AuthenticatedLayout>
     );
