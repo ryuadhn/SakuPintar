@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+    <!-- Main C-shape body -->
+    <path d="M6.5 2h10A4.5 4.5 0 0 1 21 6.5v0H12.5a5.5 5.5 0 0 0 0 11H21v0a4.5 4.5 0 0 1-4.5 4.5h-10A4.5 4.5 0 0 1 2 17.5v-11A4.5 4.5 0 0 1 6.5 2z" fill="white" />
+    <!-- Inner Card Rect with transparent center cutout hole -->
+    <path d="M15 8h3a2.5 2.5 0 0 1 2.5 2.5v3a2.5 2.5 0 0 1-2.5 2.5h-3a2.5 2.5 0 0 1-2.5-2.5v-3A2.5 2.5 0 0 1 15 8z M16.5 13.75a1.75 1.75 0 1 0 0-3.5 1.75 1.75 0 0 0 0 3.5z" fill="white" fill-rule="evenodd" clip-rule="evenodd" />
+</svg>
