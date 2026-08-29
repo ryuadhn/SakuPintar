@@ -1,16 +1,22 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import icon from '../../icon.svg';
 import { useAuth } from '../../Store/AuthContext';
 
 export default function Login() {
     const navigate = useNavigate();
-    const { login, loginWithGoogle, demo } = useAuth();
+    const { user, login, loginWithGoogle, demo } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (user) {
+            navigate('/dashboard', { replace: true });
+        }
+    }, [user, navigate]);
 
     const handleGoogleLogin = async () => {
         setError('');

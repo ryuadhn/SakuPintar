@@ -1,4 +1,4 @@
-import React, { useId, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import icon from "../../icon.svg";
 import { useAuth } from "../../Store/AuthContext";
@@ -126,7 +126,7 @@ function PasswordField({
 
 export default function Register() {
   const navigate = useNavigate();
-  const { register, login, loginWithGoogle, demo } = useAuth();
+  const { user, register, login, loginWithGoogle, demo } = useAuth();
   const formId = useId();
   const fullNameId = `${formId}-fullname`;
   const emailId = `${formId}-email`;
@@ -139,6 +139,12 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
