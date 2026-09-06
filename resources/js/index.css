@@ -1,3 +1,19 @@
+/* Compact Ledger design tokens */
+:root {
+  --ui-page: #f7faf5;
+  --ui-surface: #ffffff;
+  --ui-ink: #181d1a;
+  --ui-muted: #647269;
+  --ui-line: #dfe8e1;
+  --ui-brand: #0e6c4a;
+  --ui-radius-control: 0.625rem;
+  --ui-radius-card: 0.75rem;
+  --ui-radius-chip: 0.375rem;
+  --ui-shadow-card: 0 1px 2px rgba(24, 29, 26, 0.045);
+  --ui-shadow-floating: 0 12px 28px -16px rgba(24, 29, 26, 0.28);
+  --ui-space-page: 1.5rem;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,6 +22,23 @@
   body {
     font-family: 'Outfit', 'Inter', sans-serif;
     @apply text-slate-800 bg-slate-50/50 antialiased selection:bg-emerald-500 selection:text-white;
+    color: var(--ui-ink);
+    font-size: 0.9375rem;
+    font-synthesis: none;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
   }
 }
 
@@ -52,4 +85,191 @@
 
 .animate-blob-2 {
   animation: float-delayed 25s infinite ease-in-out;
+}
+
+/* The existing pages share Tailwind utilities, so keep density changes here
+   instead of duplicating values across every card and page. Mobile stays on
+   the original scale until it receives its own polish pass. */
+@media (min-width: 768px) {
+  .ui-density-compact {
+    --ui-space-page: 1.5rem;
+  }
+
+  .ui-density-compact .app-sidebar {
+    padding: 1.25rem;
+  }
+
+  .ui-density-compact .app-topbar {
+    height: 4rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .ui-density-compact .app-content {
+    padding: var(--ui-space-page);
+  }
+
+  .ui-density-compact .rounded-xl {
+    border-radius: var(--ui-radius-control);
+  }
+
+  .ui-density-compact .rounded-2xl,
+  .ui-density-compact .rounded-3xl {
+    border-radius: var(--ui-radius-card);
+  }
+
+  .ui-density-compact .rounded-lg {
+    border-radius: var(--ui-radius-chip);
+  }
+
+  .ui-density-compact .font-extrabold {
+    font-weight: 700;
+  }
+
+  .ui-density-compact .font-bold {
+    font-weight: 600;
+  }
+
+  .ui-density-compact .font-semibold {
+    font-weight: 500;
+  }
+
+  .ui-density-compact [class*="text-5xl"] {
+    font-size: 2.25rem;
+    line-height: 2.5rem;
+  }
+
+  .ui-density-compact [class*="text-4xl"] {
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+  }
+
+  .ui-density-compact [class*="text-3xl"] {
+    font-size: 1.5rem;
+    line-height: 2rem;
+  }
+
+  .ui-density-compact [class*="text-2xl"] {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+
+  .ui-density-compact [class*="text-xl"] {
+    font-size: 1.125rem;
+    line-height: 1.5rem;
+  }
+
+  .ui-density-compact [class*="text-lg"] {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+
+  .ui-density-compact [class*="text-base"] {
+    font-size: 0.9375rem;
+    line-height: 1.375rem;
+  }
+
+  .ui-density-compact [class*="p-8"] {
+    padding: 1.5rem;
+  }
+
+  .ui-density-compact [class*="px-8"] {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .ui-density-compact [class*="py-8"] {
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .ui-density-compact [class*="p-6"] {
+    padding: 1.25rem;
+  }
+
+  .ui-density-compact [class*="px-6"] {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+
+  .ui-density-compact [class*="py-6"] {
+    padding-top: 1.25rem;
+    padding-bottom: 1.25rem;
+  }
+
+  .ui-density-compact [class*="p-5"] {
+    padding: 1rem;
+  }
+
+  .ui-density-compact [class*="px-5"] {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .ui-density-compact [class*="py-5"] {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .ui-density-compact [class*="gap-8"] {
+    gap: 1.5rem;
+  }
+
+  .ui-density-compact [class*="gap-6"] {
+    gap: 1rem;
+  }
+
+  .ui-density-compact [class*="gap-5"] {
+    gap: 1rem;
+  }
+
+  .ui-density-compact .h-12 {
+    height: 2.625rem;
+  }
+
+  .ui-density-compact [class*="py-4"] {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .ui-density-compact [class*="py-3"] {
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
+  }
+
+  .ui-density-compact [class*="outline-stone-300"],
+  .ui-density-compact [class*="border-stone-300"] {
+    border-color: var(--ui-line);
+    outline-color: var(--ui-line);
+  }
+
+  .ui-density-compact .shadow-md,
+  .ui-density-compact .shadow-lg,
+  .ui-density-compact .shadow-xl,
+  .ui-density-compact .shadow-2xl,
+  .ui-density-compact [class*="shadow-["] {
+    box-shadow: var(--ui-shadow-card);
+  }
+
+  .ui-density-compact .ui-modal,
+  .ui-density-compact .ui-popover {
+    box-shadow: var(--ui-shadow-floating);
+  }
+}
+
+@media (min-width: 1024px) {
+  .ui-density-compact .app-sidebar {
+    width: 15rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -101,21 +101,21 @@ export default function AuthenticatedLayout({ children }) {
     const isActive = (path) => location.pathname === path;
     
     const getLinkClass = (path) => {
-        const base = "flex items-center gap-0 lg:gap-3.5 justify-center lg:justify-start p-3 lg:px-4 lg:py-3 rounded-xl transition-all duration-300 ";
+        const base = "flex items-center gap-0 lg:gap-3 justify-center lg:justify-start p-3 lg:px-3.5 lg:py-2.5 rounded-lg transition-colors duration-200 ";
         if (isActive(path)) {
-            return base + "bg-[#0e6c4a] text-white font-semibold shadow-sm";
+            return base + "bg-[#0e6c4a] text-white font-medium shadow-sm";
         }
-        return base + "text-slate-600 hover:bg-[#0e6c4a]/5 hover:text-[#0e6c4a] font-medium";
+        return base + "text-slate-600 hover:bg-[#0e6c4a]/5 hover:text-[#0e6c4a] font-normal";
     };
 
     return (
-        <div className="h-screen bg-[#F7FAF5] flex overflow-hidden">
+        <div className="ui-density-compact h-screen bg-[#F7FAF5] flex overflow-hidden">
             {/* Sidebar Kiri */}
-            <aside className="w-20 lg:w-64 bg-white text-slate-700 flex flex-col justify-between p-4 lg:p-6 hidden sm:flex border-r border-[#bec9c0] transition-all duration-300">
-                <div className="space-y-8">
+            <aside className="app-sidebar w-20 lg:w-64 bg-white text-slate-700 flex flex-col justify-between p-4 lg:p-6 hidden sm:flex border-r border-[#bec9c0] transition-all duration-300">
+                <div className="space-y-6">
                     {/* Brand */}
                     <div className="flex items-center justify-center lg:justify-start gap-2.5 px-2">
-                        <div className="w-9 h-9 bg-[#0e6c4a] rounded-xl flex justify-center items-center shadow-md shadow-emerald-950/15 shrink-0">
+                        <div className="w-9 h-9 bg-[#0e6c4a] rounded-lg flex justify-center items-center shadow-sm shadow-emerald-950/15 shrink-0">
                             <img className="w-[18px] h-[17px]" src={icon} alt="SakuPintar logo" draggable={false} />
                         </div>
                         <span className="font-bold text-[#0e6c4a] text-lg tracking-tight hidden lg:inline">SakuPintar</span>
@@ -123,50 +123,50 @@ export default function AuthenticatedLayout({ children }) {
                     
                     {/* Menu Navigasi */}
                     <nav className="space-y-1.5 flex flex-col items-center lg:items-stretch">
-                        <Link to="/dashboard" className={getLinkClass('/dashboard')}>
+                        <Link to="/dashboard" aria-label="Dashboard" className={getLinkClass('/dashboard')}>
                             <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                             </svg>
                             <span className="hidden lg:inline">Dashboard</span>
                         </Link>
-                        <Link to="/wallets" className={getLinkClass('/wallets')}>
+                        <Link to="/wallets" aria-label="Dompet" className={getLinkClass('/wallets')}>
                             <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                             </svg>
                             <span className="hidden lg:inline">Dompet</span>
                         </Link>
-                        <Link to="/savings" className={getLinkClass('/savings')}>
+                        <Link to="/savings" aria-label="Target Tabungan" className={getLinkClass('/savings')}>
                             <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                             </svg>
                             <span className="hidden lg:inline">Target Tabungan</span>
                         </Link>
-                        <Link to="/planner" className={getLinkClass('/planner')}>
+                        <Link to="/planner" aria-label="Perencana AI" className={getLinkClass('/planner')}>
                             <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A2 2 0 013 15.487V6.512a2 2 0 011.553-1.95L9 2l5.447 2.724A2 2 0 0116 6.512v8.975a2 2 0 01-1.553 1.95L9 20z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20V11M3 6.5l6 3 7-3M3 11l6 3" />
                             </svg>
                             <span className="hidden lg:inline">Perencana AI</span>
                         </Link>
-                        <Link to="/calendar" className={getLinkClass('/calendar')}>
+                        <Link to="/calendar" aria-label="Kalender Tagihan" className={getLinkClass('/calendar')}>
                             <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             <span className="hidden lg:inline">Kalender Tagihan</span>
                         </Link>
-                        <Link to="/reports" className={getLinkClass('/reports')}>
+                        <Link to="/reports" aria-label="Analisis Laporan" className={getLinkClass('/reports')}>
                             <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                             </svg>
                             <span className="hidden lg:inline">Analisis Laporan</span>
                         </Link>
-                        <Link to="/ai-advisor" className={getLinkClass('/ai-advisor')}>
+                        <Link to="/ai-advisor" aria-label="Tanya AI" className={getLinkClass('/ai-advisor')}>
                             <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                             </svg>
                             <span className="hidden lg:inline">Tanya AI</span>
                         </Link>
-                        <Link to="/categories" className={getLinkClass('/categories')}>
+                        <Link to="/categories" aria-label="Kategori" className={getLinkClass('/categories')}>
                             <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
                             </svg>
@@ -177,8 +177,8 @@ export default function AuthenticatedLayout({ children }) {
                 
                 {/* User Profile Info */}
                 <div className="space-y-3">
-                    <div className="border-t border-stone-200 pt-6 flex items-center justify-center lg:justify-start gap-3">
-                        <div className="w-10 h-10 rounded-full bg-[#0e6c4a]/10 text-[#0e6c4a] font-bold flex items-center justify-center shrink-0">
+                    <div className="border-t border-stone-200 pt-4 flex items-center justify-center lg:justify-start gap-2.5">
+                        <div className="w-9 h-9 rounded-full bg-[#0e6c4a]/10 text-[#0e6c4a] font-medium flex items-center justify-center shrink-0">
                             {initial}
                         </div>
                         <div className="min-w-0 hidden lg:block">
@@ -188,8 +188,10 @@ export default function AuthenticatedLayout({ children }) {
                     </div>
                     <div className="flex flex-col lg:flex-row items-center gap-2">
                         <button
+                            type="button"
+                            aria-label="Keluar"
                             onClick={handleLogout}
-                            className="w-10 h-10 lg:w-auto lg:flex-1 flex items-center justify-center gap-1.5 p-2 lg:px-3 lg:py-2 rounded-lg bg-slate-50 hover:bg-red-50 text-slate-500 hover:text-red-600 text-xs font-semibold transition-colors shrink-0"
+                             className="w-9 h-9 lg:w-auto lg:flex-1 flex items-center justify-center gap-1.5 p-2 lg:px-3 lg:py-1.5 rounded-md bg-slate-50 hover:bg-red-50 text-slate-500 hover:text-red-600 text-xs font-medium transition-colors shrink-0"
                             title="Keluar"
                         >
                             <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -198,8 +200,10 @@ export default function AuthenticatedLayout({ children }) {
                             <span className="hidden lg:inline">Keluar</span>
                         </button>
                         <button
+                            type="button"
+                            aria-label="Kembalikan data transaksi dan target ke contoh awal"
                             onClick={() => { if (window.confirm('Reset semua data ke contoh awal?')) resetData(); }}
-                            className="w-10 h-10 lg:w-auto lg:flex-1 flex items-center justify-center gap-1.5 p-2 lg:px-3 lg:py-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 text-xs font-semibold transition-colors shrink-0"
+                             className="w-9 h-9 lg:w-auto lg:flex-1 flex items-center justify-center gap-1.5 p-2 lg:px-3 lg:py-1.5 rounded-md bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 text-xs font-medium transition-colors shrink-0"
                             title="Kembalikan data transaksi & target ke contoh awal"
                         >
                             <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -214,7 +218,7 @@ export default function AuthenticatedLayout({ children }) {
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 {/* Navbar Atas */}
-                <header className="h-20 bg-[#F7FAF5]/80 border-b border-stone-200 backdrop-blur-[6px] flex items-center justify-between px-6 md:px-8 z-20">
+                <header className="app-topbar h-20 bg-[#F7FAF5]/80 border-b border-stone-200 backdrop-blur-[6px] flex items-center justify-between px-6 md:px-8 z-20">
                     {/* Search Field */}
                     <form
                         className="relative max-w-md w-full"
@@ -233,17 +237,21 @@ export default function AuthenticatedLayout({ children }) {
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             placeholder="Cari transaksi, tabungan atau dompet..."
-                            className="w-full bg-slate-50/50 border border-slate-200 rounded-xl py-2 pr-4 pl-10 text-sm focus:border-emerald-500 focus:ring-emerald-500 placeholder:text-slate-400"
+                             className="w-full bg-slate-50/50 border border-slate-200 rounded-lg py-1.5 pr-3.5 pl-9 text-sm focus:border-emerald-500 focus:ring-emerald-500 placeholder:text-slate-400"
                         />
                     </form>
 
                 {/* Notifications & Action */}
                 <div className="flex items-center gap-4 relative">
-                    <button
-                        onClick={() => setNotifOpen((v) => !v)}
-                        className={`p-2.5 rounded-xl hover:bg-slate-50 transition-colors relative ${totalNotifCount > 0 ? 'text-emerald-800' : 'text-slate-500'}`}
+                        <button
+                            type="button"
+                            aria-label={notifOpen ? 'Tutup pemberitahuan' : 'Buka pemberitahuan'}
+                            aria-expanded={notifOpen}
+                            aria-controls="notification-panel"
+                            onClick={() => setNotifOpen((v) => !v)}
+                        className={`p-2 rounded-lg hover:bg-slate-50 transition-colors relative ${totalNotifCount > 0 ? 'text-emerald-800' : 'text-slate-500'}`}
                     >
-                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg aria-hidden="true" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                         </svg>
                         {totalNotifCount > 0 && (
@@ -256,7 +264,7 @@ export default function AuthenticatedLayout({ children }) {
                     {notifOpen && (
                         <>
                             <div className="fixed inset-0 z-30" onClick={() => setNotifOpen(false)} />
-                            <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 z-40 overflow-hidden">
+                            <div id="notification-panel" role="region" aria-label="Pusat Pemberitahuan" className="ui-popover absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-100 z-40 overflow-hidden">
                                 <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/60">
                                     <p className="font-bold text-sm text-slate-800">Pusat Pemberitahuan</p>
                                     <p className="text-xs text-slate-500 font-medium">Informasi & peringatan keuangan Anda</p>
@@ -373,7 +381,7 @@ export default function AuthenticatedLayout({ children }) {
                 </header>
                 
                 {/* Content body wrapper */}
-                <main className="flex-1 overflow-y-auto p-6 md:p-8">
+                <main className="app-content flex-1 overflow-y-auto p-6 md:p-8">
                     {children}
                 </main>
             </div>

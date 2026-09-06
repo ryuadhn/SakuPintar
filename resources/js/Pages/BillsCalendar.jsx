@@ -1,394 +1,952 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import { useFinance } from '../Store/FinanceContext';
-import { fmtIDR } from '../Utils/format';
-import { 
-    Calendar as CalendarIcon, ChevronLeft, ChevronRight, AlertCircle, 
-    ArrowUpRight, ArrowDownRight, Clock, ToggleLeft, ToggleRight, Trash2, ShieldAlert
+import { FREQ_LABELS, fmtIDR, formatDateID, monthKeyOf, recurringTransactionId } from '../Utils/format';
+import {
+    ArrowDownRight,
+    ArrowUpRight,
+    Bell,
+    Calendar as CalendarIcon,
+    CalendarClock,
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    CircleDot,
+    Clock,
+    ListChecks,
+    Pencil,
+    Plus,
+    Receipt,
+    ToggleLeft,
+    ToggleRight,
+    Trash2,
 } from 'lucide-react';
 import RecurringModal from '../Shared/RecurringModal';
+import ReminderModal from '../Shared/ReminderModal';
+import Modal from '../Components/UI/Modal';
 
 const MONTH_NAMES = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
 ];
 
 const WEEKDAYS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
 
-export default function BillsCalendar() {
-    const { recurringRules, categories, wallets, toggleRecurringRule, deleteRecurringRule } = useFinance();
-    const [isRecurringOpen, setIsRecurringOpen] = useState(false);
+const REMINDER_TYPE_LABELS = {
+    finance: 'Keuangan',
+    task: 'Tugas',
+    schedule: 'Jadwal',
+    other: 'Lainnya',
+};
 
-    // ─── Calendar Navigation State ───
+const REMINDER_META = {
+    finance: {
+        label: 'Reminder keuangan',
+        icon: Bell,
+        chip: 'bg-amber-50 text-amber-800 border-amber-200',
+        card: 'border-amber-200 bg-amber-50/30',
+        iconBox: 'bg-amber-50 text-amber-800 border-amber-200',
+    },
+    task: {
+        label: 'Tugas',
+        icon: ListChecks,
+        chip: 'bg-slate-50 text-slate-700 border-slate-200',
+        card: 'border-slate-200 bg-slate-50/40',
+        iconBox: 'bg-slate-100 text-slate-700 border-slate-200',
+    },
+    schedule: {
+        label: 'Jadwal',
+        icon: CalendarClock,
+        chip: 'bg-sky-50 text-sky-800 border-sky-200',
+        card: 'border-sky-200 bg-sky-50/20',
+        iconBox: 'bg-sky-50 text-sky-800 border-sky-200',
+    },
+    other: {
+        label: 'Lainnya',
+        icon: CircleDot,
+        chip: 'bg-stone-50 text-stone-700 border-stone-200',
+        card: 'border-stone-200 bg-stone-50/50',
+        iconBox: 'bg-stone-100 text-stone-700 border-stone-200',
+    },
+};
+
+const LEGEND_ITEMS = [
+    { label: 'Aktivitas keuangan', icon: Receipt, className: 'text-emerald-800 bg-emerald-50 border-emerald-200' },
+    { label: 'Reminder keuangan', icon: Bell, className: 'text-amber-800 bg-amber-50 border-amber-200' },
+    { label: 'Tugas', icon: ListChecks, className: 'text-slate-700 bg-slate-50 border-slate-200' },
+    { label: 'Jadwal', icon: CalendarClock, className: 'text-sky-800 bg-sky-50 border-sky-200' },
+    { label: 'Lainnya', icon: CircleDot, className: 'text-stone-700 bg-stone-50 border-stone-200' },
+];
+
+const getReminderMeta = (type) => REMINDER_META[type] || REMINDER_META.other;
+
+const getDateKey = (year, month, day) => (
+    `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+);
+
+const parseISODate = (iso) => {
+    if (typeof iso !== 'string') return null;
+    const [year, month, day] = iso.split('-').map(Number);
+    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+    if (month < 1 || month > 12 || day < 1 || day > new Date(year, month, 0).getDate()) return null;
+    return { year, month: month - 1, day };
+};
+
+const utcDay = ({ year, month, day }) => Date.UTC(year, month, day);
+
+const isRecurringOccurrenceOnDate = (rule, year, month, day) => {
+    if (!rule.active || !rule.nextDate) return false;
+
+    const start = parseISODate(rule.nextDate);
+    const target = { year, month, day };
+    if (!start || utcDay(target) < utcDay(start)) return false;
+
+    const daysSinceStart = Math.round((utcDay(target) - utcDay(start)) / 86400000);
+    if (rule.frequency === 'daily') return true;
+    if (rule.frequency === 'weekly') return daysSinceStart % 7 === 0;
+    if (rule.frequency === 'monthly') {
+        const lastDayOfTargetMonth = new Date(year, month + 1, 0).getDate();
+        const parsedAnchorDay = Number(rule.anchorDay);
+        const anchorDay = Number.isInteger(parsedAnchorDay) && parsedAnchorDay >= 1 && parsedAnchorDay <= 31
+            ? parsedAnchorDay
+            : start.day;
+        return day === Math.min(anchorDay, lastDayOfTargetMonth);
+    }
+    return false;
+};
+
+const formatLongDate = (year, month, day) => (
+    new Intl.DateTimeFormat('id-ID', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    }).format(new Date(year, month, day))
+);
+
+const formatShortTime = (time) => time || 'Tanpa waktu';
+
+const getSignedAmount = (type, amount) => {
+    if (type === 'income') return `+${fmtIDR(amount)}`;
+    if (type === 'expense') return `-${fmtIDR(amount)}`;
+    return fmtIDR(amount);
+};
+
+export default function BillsCalendar() {
+    const {
+        transactions = [],
+        recurringRules = [],
+        reminders = [],
+        categories = [],
+        wallets = [],
+        toggleRecurringRule,
+        deleteRecurringRule,
+        toggleReminder,
+        deleteReminder,
+        syncLoading = false,
+        syncError = '',
+        retrySync,
+        calendarBusy = false,
+        calendarError = '',
+        clearCalendarError,
+    } = useFinance();
+    const [isRecurringOpen, setIsRecurringOpen] = useState(false);
+    const [isReminderOpen, setIsReminderOpen] = useState(false);
+    const [editingReminder, setEditingReminder] = useState(null);
+    const [deletingReminder, setDeletingReminder] = useState(null);
+    const [deletingRecurring, setDeletingRecurring] = useState(null);
+
     const today = new Date();
     const [currentYear, setCurrentYear] = useState(today.getFullYear());
-    const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // 0-indexed
+    const [currentMonth, setCurrentMonth] = useState(today.getMonth());
     const [selectedDay, setSelectedDay] = useState(today.getDate());
+    const selectedDateIsToday = selectedDay === today.getDate()
+        && currentMonth === today.getMonth()
+        && currentYear === today.getFullYear();
+    const calendarActionsDisabled = syncLoading || calendarBusy;
 
-    const handlePrevMonth = () => {
-        if (currentMonth === 0) {
-            setCurrentMonth(11);
-            setCurrentYear(prev => prev - 1);
-        } else {
-            setCurrentMonth(prev => prev - 1);
-        }
-    };
-
-    const handleNextMonth = () => {
-        if (currentMonth === 11) {
-            setCurrentMonth(0);
-            setCurrentYear(prev => prev + 1);
-        } else {
-            setCurrentMonth(prev => prev + 1);
-        }
-    };
-
-    // ─── Projections Logic ───
-    const daysInMonth = useMemo(() => {
-        return new Date(currentYear, currentMonth + 1, 0).getDate();
-    }, [currentYear, currentMonth]);
+    const daysInMonth = useMemo(
+        () => new Date(currentYear, currentMonth + 1, 0).getDate(),
+        [currentYear, currentMonth],
+    );
 
     const startDayOfWeek = useMemo(() => {
-        // Get day of week of the 1st of the month (0 = Sun, 1 = Mon...)
-        let day = new Date(currentYear, currentMonth, 1).getDay();
-        // Adjust so Monday is index 0
+        const day = new Date(currentYear, currentMonth, 1).getDay();
         return day === 0 ? 6 : day - 1;
     }, [currentYear, currentMonth]);
 
-    // Build array of grid cells (including empty padding for start of month)
     const calendarCells = useMemo(() => {
         const cells = [];
-        
-        // Padding cells for starting day offset
-        for (let i = 0; i < startDayOfWeek; i++) {
+        for (let i = 0; i < startDayOfWeek; i += 1) {
             cells.push({ dayNumber: null, key: `empty-${i}` });
         }
-        
-        // Month days
-        for (let day = 1; day <= daysInMonth; day++) {
+        for (let day = 1; day <= daysInMonth; day += 1) {
             cells.push({ dayNumber: day, key: `day-${day}` });
         }
-        
         return cells;
     }, [daysInMonth, startDayOfWeek]);
 
-    // Match rules for a specific day number
-    const getRulesForDay = (dayNum) => {
-        if (!dayNum) return [];
-        return recurringRules.filter(rule => {
-            if (!rule.active) return false;
-            // Parse day from nextDate (formatted as YYYY-MM-DD)
-            const ruleDay = parseInt(rule.nextDate.split('-')[2]);
-            return ruleDay === dayNum;
-        });
+    const getRulesForDay = (dayNumber) => {
+        if (!dayNumber) return [];
+        return recurringRules.filter((rule) => isRecurringOccurrenceOnDate(
+            rule,
+            currentYear,
+            currentMonth,
+            dayNumber,
+        ));
     };
 
-    // Selected date rules
-    const selectedDayRules = useMemo(() => {
-        return getRulesForDay(selectedDay);
-    }, [selectedDay, recurringRules]);
+    const getTransactionsForDay = (dayNumber) => {
+        if (!dayNumber) return [];
+        return transactions.filter((transaction) => (
+            transaction.date === getDateKey(currentYear, currentMonth, dayNumber)
+        ));
+    };
 
-    // ─── Stats: Bill Summary for viewed month ───
+    const getRemindersForDay = (dayNumber) => {
+        if (!dayNumber) return [];
+        return reminders.filter((reminder) => (
+            reminder.date === getDateKey(currentYear, currentMonth, dayNumber)
+        ));
+    };
+
+    const selectedDayRules = useMemo(
+        () => getRulesForDay(selectedDay),
+        [selectedDay, currentYear, currentMonth, recurringRules],
+    );
+
+    const selectedDayTransactions = useMemo(
+        () => getTransactionsForDay(selectedDay),
+        [selectedDay, currentYear, currentMonth, transactions],
+    );
+
+    const selectedDayReminders = useMemo(
+        () => getRemindersForDay(selectedDay),
+        [selectedDay, currentYear, currentMonth, reminders],
+    );
+
+    const financialAgenda = useMemo(() => {
+        const transactionItems = selectedDayTransactions.map((transaction) => ({
+            ...transaction,
+            itemType: 'transaction',
+            sortTime: transaction.time || '99:99',
+        }));
+        const recurringItems = selectedDayRules.map((rule) => ({
+            ...rule,
+            itemType: 'recurring',
+            sortTime: '00:00',
+        }));
+        return [...transactionItems, ...recurringItems].sort((a, b) => (
+            a.sortTime.localeCompare(b.sortTime)
+        ));
+    }, [selectedDayRules, selectedDayTransactions]);
+
+    const selectedAgendaCount = financialAgenda.length + selectedDayReminders.length;
+    const completedReminderCount = selectedDayReminders.filter((reminder) => reminder.isCompleted).length;
+
     const monthlyStats = useMemo(() => {
         let totalIncome = 0;
         let totalExpense = 0;
+        const monthKey = getDateKey(currentYear, currentMonth, 1).slice(0, 7);
+        const monthTransactions = transactions.filter((transaction) => monthKeyOf(transaction.date) === monthKey);
+        const postedRecurringIds = new Set();
 
-        recurringRules.forEach(rule => {
+        recurringRules.forEach((rule) => {
+            monthTransactions.forEach((transaction) => {
+                if (transaction.id === recurringTransactionId(rule.id, transaction.date)) {
+                    postedRecurringIds.add(transaction.id);
+                }
+            });
+        });
+
+        monthTransactions.forEach((transaction) => {
+            if (!transaction.auto && !postedRecurringIds.has(transaction.id)) return;
+            const amount = Number(transaction.amount) || 0;
+            if (transaction.type === 'income') totalIncome += amount;
+            else if (transaction.type === 'expense') totalExpense += amount;
+        });
+
+        recurringRules.forEach((rule) => {
             if (!rule.active) return;
-            if (rule.type === 'income') {
-                totalIncome += rule.amount;
-            } else {
-                totalExpense += rule.amount;
+            for (let day = 1; day <= new Date(currentYear, currentMonth + 1, 0).getDate(); day += 1) {
+                if (!isRecurringOccurrenceOnDate(rule, currentYear, currentMonth, day)) continue;
+                const occurrenceId = recurringTransactionId(rule.id, getDateKey(currentYear, currentMonth, day));
+                if (postedRecurringIds.has(occurrenceId)) continue;
+                const amount = Number(rule.amount) || 0;
+                if (rule.type === 'income') totalIncome += amount;
+                else totalExpense += amount;
             }
         });
 
         return { totalIncome, totalExpense };
-    }, [recurringRules]);
+    }, [currentYear, currentMonth, recurringRules, transactions]);
 
-    // ─── Upcoming bills in next 14 days ───
     const upcomingBills = useMemo(() => {
         const list = [];
-        const todayMs = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+        const todayParts = { year: today.getFullYear(), month: today.getMonth(), day: today.getDate() };
+        const todayMs = utcDay(todayParts);
 
-        for (let offset = 0; offset < 14; offset++) {
+        for (let offset = 0; offset < 14; offset += 1) {
             const scanDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset);
-            const scanDayNum = scanDate.getDate();
-            const scanDayRules = recurringRules.filter(rule => {
-                if (!rule.active) return false;
-                const ruleDay = parseInt(rule.nextDate.split('-')[2]);
-                return ruleDay === scanDayNum;
-            });
-
-            scanDayRules.forEach(rule => {
-                list.push({
+            recurringRules
+                .filter((rule) => isRecurringOccurrenceOnDate(
                     rule,
-                    date: scanDate,
-                    daysRemaining: offset
+                    scanDate.getFullYear(),
+                    scanDate.getMonth(),
+                    scanDate.getDate(),
+                ))
+                .forEach((rule) => {
+                    const scanParts = {
+                        year: scanDate.getFullYear(),
+                        month: scanDate.getMonth(),
+                        day: scanDate.getDate(),
+                    };
+                    list.push({
+                        rule,
+                        date: scanDate,
+                        daysRemaining: Math.round((utcDay(scanParts) - todayMs) / 86400000),
+                    });
                 });
-            });
         }
 
         return list.sort((a, b) => a.daysRemaining - b.daysRemaining);
-    }, [recurringRules]);
+    }, [recurringRules, today.getFullYear(), today.getMonth(), today.getDate()]);
+
+    const goToMonth = (offset) => {
+        const nextMonth = new Date(currentYear, currentMonth + offset, 1);
+        setCurrentYear(nextMonth.getFullYear());
+        setCurrentMonth(nextMonth.getMonth());
+        setSelectedDay(1);
+    };
+
+    const goToToday = () => {
+        setCurrentYear(today.getFullYear());
+        setCurrentMonth(today.getMonth());
+        setSelectedDay(today.getDate());
+    };
+
+    const openAddReminder = () => {
+        setEditingReminder(null);
+        setIsReminderOpen(true);
+    };
+
+    const openEditReminder = (reminder) => {
+        setEditingReminder(reminder);
+        setIsReminderOpen(true);
+    };
+
+    const requestDeleteReminder = (reminder) => {
+        clearCalendarError();
+        setDeletingReminder(reminder);
+    };
+
+    const requestDeleteRecurring = (rule) => {
+        clearCalendarError();
+        setDeletingRecurring(rule);
+    };
+
+    const confirmDeleteReminder = async () => {
+        if (!deletingReminder) return;
+        const deleted = await deleteReminder(deletingReminder.id);
+        if (deleted) setDeletingReminder(null);
+    };
+
+    const confirmDeleteRecurring = async () => {
+        if (!deletingRecurring) return;
+        const deleted = await deleteRecurringRule(deletingRecurring.id);
+        if (deleted) setDeletingRecurring(null);
+    };
 
     return (
         <AuthenticatedLayout>
-            <div className="flex flex-col gap-8 pb-12">
-                
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-                    <div>
-                        <h1 className="text-zinc-900 text-3xl font-bold leading-10 flex items-center gap-3">
-                            <CalendarIcon className="w-8 h-8 text-emerald-800" />
-                            Kalender Tagihan
+            <div className="mx-auto flex max-w-[1440px] flex-col gap-6 pb-12">
+                <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="max-w-2xl">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-800">
+                            Perencanaan uang
+                        </span>
+                        <h1 className="mt-1 flex items-center gap-2.5 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+                            <CalendarIcon className="h-7 w-7 shrink-0 text-emerald-800 sm:h-8 sm:w-8" aria-hidden="true" />
+                            Kalender &amp; pengingat
                         </h1>
-                        <p className="text-neutral-700 text-sm mt-1">Pantau dan kelola jadwal jatuh tempo pembayaran tagihan rutin bulanan Anda.</p>
+                        <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-slate-500">
+                            Lihat transaksi, tagihan rutin, dan hal penting lain dalam satu agenda yang mudah dipindai.
+                        </p>
                     </div>
-                    <button
-                        onClick={() => setIsRecurringOpen(true)}
-                        className="px-5 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm self-start md:self-auto flex items-center gap-2"
-                    >
-                        <CalendarIcon className="w-4 h-4" />
-                        Tambah Tagihan Rutin
-                    </button>
-                </div>
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                        <button
+                            type="button"
+                            onClick={() => setIsRecurringOpen(true)}
+                            disabled={calendarActionsDisabled}
+                            className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60 sm:w-auto"
+                        >
+                            <Plus className="h-4 w-4" aria-hidden="true" />
+                            Tambah tagihan rutin
+                        </button>
+                        <button
+                            type="button"
+                            onClick={openAddReminder}
+                            disabled={calendarActionsDisabled}
+                            className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-amber-200 bg-white px-4 py-2.5 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-50 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60 sm:w-auto"
+                        >
+                            <Bell className="h-4 w-4" aria-hidden="true" />
+                            Tambah pengingat
+                        </button>
+                    </div>
+                </header>
 
-                {/* Main Split Grid */}
-                <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
-                    
-                    {/* Left: Interactive Calendar Grid (8/12) */}
-                    <div className="xl:col-span-8 bg-white p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col gap-6">
-                        
-                        {/* Month Navigator Header */}
-                        <div className="flex justify-between items-center">
-                            <div className="flex flex-col">
-                                <h2 className="font-extrabold text-slate-800 text-xl tracking-tight">
+                {syncLoading && (
+                    <div role="status" aria-live="polite" className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800">
+                        Memuat data kalender...
+                    </div>
+                )}
+                {syncError && (
+                    <div role="alert" className="flex flex-col gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800 sm:flex-row sm:items-center sm:justify-between">
+                        <span>{syncError}</span>
+                        <button
+                            type="button"
+                            onClick={retrySync}
+                            className="inline-flex min-h-[44px] items-center justify-center rounded-lg px-3 text-xs font-bold text-rose-800 transition-colors hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-700 focus-visible:ring-offset-2"
+                        >
+                            Coba lagi
+                        </button>
+                    </div>
+                )}
+                {calendarError && !isReminderOpen && !deletingReminder && !deletingRecurring && (
+                    <div role="alert" className="flex flex-col gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800 sm:flex-row sm:items-center sm:justify-between">
+                        <span>{calendarError}</span>
+                        <button
+                            type="button"
+                            onClick={clearCalendarError}
+                            className="inline-flex min-h-[44px] items-center justify-center rounded-lg px-3 text-xs font-bold text-rose-800 transition-colors hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-700 focus-visible:ring-offset-2"
+                        >
+                            Tutup
+                        </button>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-12">
+                    <section aria-busy={syncLoading} className="flex flex-col gap-5 rounded-2xl border border-[#e2e9e3] bg-white p-4 shadow-sm sm:p-6 xl:col-span-8" aria-labelledby="calendar-heading">
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Kalender</span>
+                                <h2 id="calendar-heading" className="mt-1 text-xl font-extrabold tracking-tight text-slate-900">
                                     {MONTH_NAMES[currentMonth]} {currentYear}
                                 </h2>
-                                <p className="text-slate-500 text-xs mt-0.5">Klik pada tanggal untuk melihat detail jadwal.</p>
+                                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                                    Pilih tanggal untuk membuka daily brief Anda.
+                                </p>
                             </div>
-                            
-                            <div className="flex items-center gap-2">
-                                <button 
-                                    onClick={handlePrevMonth}
-                                    className="p-2 border border-slate-200 hover:bg-slate-50 rounded-xl transition-all"
+                            <div className="flex shrink-0 items-center gap-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() => goToMonth(-1)}
+                                    aria-label="Bulan sebelumnya"
+                                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"
                                 >
-                                    <ChevronLeft className="w-5 h-5 text-slate-600" />
+                                    <ChevronLeft className="h-5 w-5" aria-hidden="true" />
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        setCurrentYear(today.getFullYear());
-                                        setCurrentMonth(today.getMonth());
-                                        setSelectedDay(today.getDate());
-                                    }}
-                                    className="px-3.5 py-2 border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-semibold text-slate-600 transition-all"
+                                    type="button"
+                                    onClick={goToToday}
+                                    className="hidden min-h-[44px] rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 sm:inline-flex sm:items-center"
                                 >
-                                    Hari Ini
+                                    Hari ini
                                 </button>
-                                <button 
-                                    onClick={handleNextMonth}
-                                    className="p-2 border border-slate-200 hover:bg-slate-50 rounded-xl transition-all"
+                                <button
+                                    type="button"
+                                    onClick={() => goToMonth(1)}
+                                    aria-label="Bulan berikutnya"
+                                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"
                                 >
-                                    <ChevronRight className="w-5 h-5 text-slate-600" />
+                                    <ChevronRight className="h-5 w-5" aria-hidden="true" />
                                 </button>
                             </div>
                         </div>
 
-                        {/* Calendar Grid Container */}
-                        <div className="border border-stone-100 rounded-2xl overflow-hidden">
-                            {/* Day Labels */}
-                            <div className="grid grid-cols-7 bg-slate-50 border-b border-stone-100 text-center py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                {WEEKDAYS.map(day => (
-                                    <div key={day}>{day}</div>
-                                ))}
-                            </div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-2 border-y border-[#e2e9e3] py-3" aria-label="Keterangan jenis agenda">
+                            {LEGEND_ITEMS.map(({ label, icon: LegendIcon, className }) => (
+                                <div key={label} className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-slate-600">
+                                    <span className={`inline-flex h-5 w-5 items-center justify-center rounded-md border ${className}`}>
+                                        <LegendIcon className="h-3 w-3" aria-hidden="true" />
+                                    </span>
+                                    {label}
+                                </div>
+                            ))}
+                        </div>
 
-                            {/* Calendar Days */}
-                            <div className="grid grid-cols-7 auto-rows-[90px] md:auto-rows-[100px] divide-x divide-y divide-stone-100 bg-white">
+                        <div className="overflow-hidden rounded-xl border border-[#e2e9e3]">
+                            <div className="grid grid-cols-7 border-b border-[#e2e9e3] bg-slate-50/80 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                                {WEEKDAYS.map((day) => <span key={day}>{day}</span>)}
+                            </div>
+                            <div className="grid grid-cols-7 auto-rows-[76px] divide-x divide-y divide-[#e2e9e3] bg-white sm:auto-rows-[104px]">
                                 {calendarCells.map((cell) => {
-                                    const isToday = cell.dayNumber === today.getDate() && 
-                                                    currentMonth === today.getMonth() && 
-                                                    currentYear === today.getFullYear();
-                                                    
-                                    const isSelected = cell.dayNumber === selectedDay;
+                                    if (!cell.dayNumber) {
+                                        return <div key={cell.key} className="bg-slate-50/40" aria-hidden="true" />;
+                                    }
+
+                                    const dayTransactions = getTransactionsForDay(cell.dayNumber);
                                     const dayRules = getRulesForDay(cell.dayNumber);
+                                    const dayReminders = getRemindersForDay(cell.dayNumber);
+                                    const dayEvents = [
+                                        ...dayTransactions.map((transaction) => ({
+                                            id: `transaction-${transaction.id}`,
+                                            title: transaction.title,
+                                            icon: transaction.type === 'income' ? ArrowUpRight : ArrowDownRight,
+                                            chip: 'bg-emerald-50/80 text-emerald-800 border-emerald-200',
+                                            isCompleted: false,
+                                        })),
+                                        ...dayRules.map((rule) => ({
+                                            id: `rule-${rule.id}`,
+                                            title: rule.title,
+                                            icon: rule.type === 'income' ? ArrowUpRight : ArrowDownRight,
+                                            chip: 'bg-emerald-50/80 text-emerald-800 border-emerald-200',
+                                            isCompleted: false,
+                                        })),
+                                        ...dayReminders.map((reminder) => {
+                                            const meta = getReminderMeta(reminder.type);
+                                            return {
+                                                id: `reminder-${reminder.id}`,
+                                                title: reminder.title,
+                                                icon: meta.icon,
+                                                chip: meta.chip,
+                                                isCompleted: reminder.isCompleted,
+                                            };
+                                        }),
+                                    ];
+                                    const isToday = cell.dayNumber === today.getDate()
+                                        && currentMonth === today.getMonth()
+                                        && currentYear === today.getFullYear();
+                                    const isSelected = cell.dayNumber === selectedDay;
+                                    const visibleEvents = dayEvents.slice(0, 3);
+                                    const eventCountLabel = dayEvents.length > 0
+                                        ? `${dayEvents.length} agenda: ${dayEvents.slice(0, 2).map((event) => event.title).join(', ')}`
+                                        : 'Tidak ada agenda';
+                                    const dateLabel = `Tanggal ${cell.dayNumber} ${MONTH_NAMES[currentMonth]} ${currentYear}${isToday ? ', hari ini' : ''}, ${eventCountLabel}`;
 
                                     return (
-                                        <div 
-                                            key={cell.key}
-                                            onClick={() => cell.dayNumber && setSelectedDay(cell.dayNumber)}
-                                            className={`p-2 flex flex-col justify-between items-stretch transition-all relative ${
-                                                cell.dayNumber ? 'cursor-pointer hover:bg-slate-50/50' : 'bg-slate-50/30'
-                                            } ${isSelected && cell.dayNumber ? 'bg-emerald-50/30 ring-1 ring-emerald-600/20' : ''}`}
+                                        <button
+                                             key={cell.key}
+                                             type="button"
+                                             onClick={() => setSelectedDay(cell.dayNumber)}
+                                             aria-label={dateLabel}
+                                             aria-current={isToday ? 'date' : undefined}
+                                             aria-pressed={isSelected}
+                                            className={`group flex min-w-0 flex-col items-stretch gap-1 p-1.5 text-left transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-700 sm:p-2 ${
+                                                isSelected ? 'bg-emerald-50/70' : 'hover:bg-slate-50'
+                                            }`}
                                         >
-                                            {/* Day Number and Today Indicator */}
-                                            <div className="flex justify-between items-center">
-                                                <span className={`text-xs font-bold ${
-                                                    cell.dayNumber ? 'text-slate-700' : 'text-slate-300'
-                                                } ${isToday ? 'w-5.5 h-5.5 bg-emerald-800 text-white rounded-full flex items-center justify-center font-extrabold' : ''}`}>
-                                                    {cell.dayNumber}
-                                                </span>
-                                            </div>
-
-                                            {/* Due Badges List */}
-                                            <div className="flex flex-col gap-1.5 overflow-y-hidden mt-1.5">
-                                                {dayRules.slice(0, 2).map(r => (
-                                                    <div 
-                                                        key={r.id} 
-                                                        className={`px-1.5 py-0.5 rounded text-[9px] font-bold truncate leading-tight border ${
-                                                            r.type === 'income' 
-                                                                ? 'bg-emerald-50 text-emerald-800 border-emerald-100' 
-                                                                : 'bg-rose-50 text-rose-800 border-rose-100'
-                                                        }`}
-                                                    >
-                                                        {r.title}
-                                                    </div>
-                                                ))}
-                                                {dayRules.length > 2 && (
-                                                    <span className="text-[9px] text-slate-400 font-bold block pl-1">
-                                                        +{dayRules.length - 2} lainnya
+                                            <span className={`flex h-6 w-6 items-center justify-center self-start text-xs font-bold ${
+                                                isToday
+                                                    ? 'rounded-full bg-emerald-800 text-white'
+                                                    : isSelected
+                                                        ? 'text-emerald-800'
+                                                        : 'text-slate-700'
+                                            }`}>
+                                                {cell.dayNumber}
+                                            </span>
+                                            <span className="flex min-w-0 flex-col gap-1 overflow-hidden">
+                                                {visibleEvents.map((event) => {
+                                                    const EventIcon = event.icon;
+                                                    return (
+                                                        <span
+                                                            key={event.id}
+                                                             className={`inline-flex min-w-0 items-center justify-center gap-1 rounded-md border border-l-2 px-1 py-1 text-[9px] font-bold leading-none sm:justify-start sm:px-1.5 sm:py-1 ${event.chip} ${event.isCompleted ? 'text-slate-500 line-through opacity-80' : ''}`}
+                                                            title={event.title}
+                                                            aria-hidden="true"
+                                                        >
+                                                            <EventIcon className="h-2.5 w-2.5 shrink-0" />
+                                                            <span className="hidden truncate sm:inline">{event.title}</span>
+                                                        </span>
+                                                    );
+                                                })}
+                                                {dayEvents.length > 3 && (
+                                                     <span className="truncate pl-1 text-[9px] font-bold text-slate-500">
+                                                        +{dayEvents.length - 3} agenda
                                                     </span>
                                                 )}
-                                            </div>
-                                        </div>
+                                            </span>
+                                        </button>
                                     );
                                 })}
                             </div>
                         </div>
 
-                        {/* Viewed Month Billing summary */}
-                        <div className="grid grid-cols-2 gap-4 border border-stone-100 bg-slate-50/50 p-4 rounded-2xl">
+                        <div className="grid grid-cols-1 gap-3 border-t border-[#e2e9e3] pt-4 sm:grid-cols-2">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-800">
-                                    <ArrowUpRight className="w-5 h-5" />
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800">
+                                    <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
                                 </div>
                                 <div>
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pemasukan Rutin</span>
-                                    <span className="text-sm font-bold text-slate-800">{fmtIDR(monthlyStats.totalIncome)}</span>
+                                    <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Pemasukan rutin</span>
+                                    <span className="tabular-nums text-sm font-bold text-slate-800">{fmtIDR(monthlyStats.totalIncome)}</span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3 border-l border-stone-200 pl-4">
-                                <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-800">
-                                    <ArrowDownRight className="w-5 h-5" />
+                            <div className="flex items-center gap-3 border-t border-[#e2e9e3] pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-800">
+                                    <ArrowDownRight className="h-4 w-4" aria-hidden="true" />
                                 </div>
                                 <div>
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tagihan Keluar</span>
-                                    <span className="text-sm font-bold text-slate-800">{fmtIDR(monthlyStats.totalExpense)}</span>
+                                    <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Tagihan rutin</span>
+                                    <span className="tabular-nums text-sm font-bold text-slate-800">{fmtIDR(monthlyStats.totalExpense)}</span>
                                 </div>
                             </div>
                         </div>
+                    </section>
 
-                    </div>
-
-                    {/* Right: Selected Date details + Upcoming Alerts (4/12) */}
-                    <div className="xl:col-span-4 flex flex-col gap-6">
-                        
-                        {/* Day Details Card */}
-                        <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col gap-4">
-                            <div>
-                                <h3 className="font-bold text-slate-800 text-base">Detail Tanggal {selectedDay}</h3>
-                                <p className="text-slate-500 text-xs mt-0.5">Jadwal transaksi rutin pada hari yang Anda pilih.</p>
+                    <div className="flex flex-col gap-6 xl:col-span-4">
+                        <section className="flex flex-col gap-5 rounded-2xl border border-[#e2e9e3] bg-white p-4 shadow-sm sm:p-6" aria-labelledby="selected-agenda-heading">
+                            <div className="flex items-start gap-3">
+                                <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-emerald-800 text-white">
+                                    <span className="text-xl font-extrabold leading-none">{selectedDay}</span>
+                                    <span className="mt-1 text-[9px] font-bold uppercase tracking-[0.12em]">{MONTH_NAMES[currentMonth].slice(0, 3)}</span>
+                                </div>
+                                <div className="min-w-0 pt-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-800">Agenda tanggal</span>
+                                    <h2 id="selected-agenda-heading" className="mt-1 text-base font-extrabold capitalize leading-snug text-slate-900">
+                                        {formatLongDate(currentYear, currentMonth, selectedDay)}
+                                    </h2>
+                                     <p className="mt-1 text-xs text-slate-500">
+                                         {selectedAgendaCount === 0
+                                             ? selectedDateIsToday ? 'Belum ada agenda terjadwal hari ini.' : 'Belum ada agenda terjadwal pada tanggal ini.'
+                                             : `${selectedAgendaCount} agenda pada ${selectedDateIsToday ? 'hari ini' : 'tanggal ini'}.`}
+                                     </p>
+                                </div>
                             </div>
 
-                            {selectedDayRules.length === 0 ? (
-                                <div className="py-8 text-center border border-dashed border-stone-200 rounded-2xl flex flex-col items-center justify-center gap-2">
-                                    <Clock className="w-6 h-6 text-slate-400" />
-                                    <span className="text-xs text-slate-400 font-semibold">Tidak ada tagihan terjadwal.</span>
+                            {selectedAgendaCount === 0 ? (
+                                <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center">
+                                     <Clock className="h-6 w-6 text-slate-500" aria-hidden="true" />
+                                    <div>
+                                         <p className="text-sm font-semibold text-slate-700">{selectedDateIsToday ? 'Hari ini' : 'Tanggal ini'} masih kosong</p>
+                                        <p className="mt-1 text-xs leading-relaxed text-slate-500">Tambahkan pengingat jika ada hal yang perlu Anda ingat.</p>
+                                    </div>
+                                         <button
+                                             type="button"
+                                             onClick={openAddReminder}
+                                             disabled={calendarActionsDisabled}
+                                             className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-emerald-800 transition-colors hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
+                                    >
+                                        <Plus className="h-4 w-4" aria-hidden="true" />
+                                        Tambah pengingat
+                                    </button>
                                 </div>
                             ) : (
-                                <div className="space-y-3">
-                                    {selectedDayRules.map(rule => {
-                                        const catObj = categories.find(c => c.id === rule.categoryId) || { name: 'Lainnya' };
-                                        const wObj = wallets.find(w => w.id === rule.walletId) || { name: 'Utama' };
-
-                                        return (
-                                            <div key={rule.id} className="p-3.5 border border-stone-150 hover:border-stone-300 rounded-2xl flex flex-col gap-3 transition-colors bg-slate-50/20">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <h5 className="text-xs font-bold text-slate-800">{rule.title}</h5>
-                                                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mt-0.5">
-                                                            {catObj.name} • {wObj.name}
-                                                        </span>
-                                                    </div>
-                                                    <span className={`text-xs font-bold ${
-                                                        rule.type === 'income' ? 'text-emerald-800' : 'text-rose-800'
-                                                    }`}>
-                                                        {rule.type === 'income' ? '+' : '-'}{fmtIDR(rule.amount)}
-                                                    </span>
-                                                </div>
-
-                                                <div className="flex justify-between items-center border-t border-stone-100 pt-2.5">
-                                                    <button
-                                                        onClick={() => toggleRecurringRule(rule.id)}
-                                                        className="flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-slate-700 transition-colors"
-                                                    >
-                                                        {rule.active ? (
-                                                            <ToggleRight className="w-5 h-5 text-emerald-800 shrink-0" />
-                                                        ) : (
-                                                            <ToggleLeft className="w-5 h-5 text-slate-400 shrink-0" />
-                                                        )}
-                                                        {rule.active ? 'Aktif' : 'Mati'}
-                                                    </button>
-
-                                                    <button
-                                                        onClick={() => deleteRecurringRule(rule.id)}
-                                                        className="text-slate-400 hover:text-rose-600 p-1 rounded transition-colors"
-                                                        title="Hapus"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
+                                <>
+                                    {financialAgenda.length > 0 && (
+                                        <section aria-labelledby="financial-agenda-heading">
+                                            <div className="mb-2 flex items-center justify-between gap-3">
+                                                <h3 id="financial-agenda-heading" className="text-xs font-extrabold uppercase tracking-[0.12em] text-slate-700">Aktivitas keuangan</h3>
+                                                <span className="text-[10px] font-bold text-slate-500">{financialAgenda.length} item</span>
                                             </div>
-                                        );
-                                    })}
-                                </div>
+                                            <div className="divide-y divide-[#e2e9e3] overflow-hidden rounded-xl border border-[#e2e9e3]">
+                                                {financialAgenda.map((item) => {
+                                                    const isIncome = item.type === 'income';
+                                                    const isTransfer = item.type === 'transfer';
+                                                    const category = categories.find((categoryItem) => categoryItem.id === item.categoryId);
+                                                    const wallet = wallets.find((walletItem) => walletItem.id === item.walletId);
+                                                    const ItemIcon = isIncome ? ArrowUpRight : ArrowDownRight;
+                                                    const detail = isTransfer
+                                                        ? `${wallets.find((walletItem) => walletItem.id === item.fromWalletId)?.name || 'Dompet'} ke ${wallets.find((walletItem) => walletItem.id === item.toWalletId)?.name || 'dompet lain'}`
+                                                        : `${category?.name || 'Lainnya'}${wallet ? ` • ${wallet.name}` : ''}`;
+
+                                                    return (
+                                                        <div key={`${item.itemType}-${item.id}`} className="p-3.5">
+                                                            <div className="flex items-start gap-3">
+                                                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${isIncome ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>
+                                                                    <ItemIcon className="h-4 w-4" aria-hidden="true" />
+                                                                </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex items-start justify-between gap-2">
+                                                                        <div className="min-w-0">
+                                                                            <h4 className="truncate text-xs font-bold text-slate-800">{item.title}</h4>
+                                                                            <p className="mt-0.5 truncate text-[10px] font-semibold text-slate-500">
+                                                                                {item.itemType === 'recurring'
+                                                                                    ? item.type === 'income' ? 'Pemasukan rutin' : 'Tagihan rutin'
+                                                                                    : isTransfer ? 'Transfer' : 'Transaksi'}
+                                                                                {item.time ? ` • ${item.time}` : ''}
+                                                                            </p>
+                                                                        </div>
+                                                                        <span className={`shrink-0 text-xs font-bold tabular-nums ${isIncome ? 'text-emerald-800' : isTransfer ? 'text-slate-700' : 'text-rose-800'}`}>
+                                                                            {getSignedAmount(item.type, item.amount)}
+                                                                        </span>
+                                                                    </div>
+                                                                     <p className="mt-1 text-[10px] leading-relaxed text-slate-500">{detail}</p>
+                                                                </div>
+                                                            </div>
+                                                            {item.itemType === 'recurring' && (
+                                                                <div className="mt-3 flex items-center justify-between border-t border-[#e2e9e3] pt-2">
+                                                                     <button
+                                                                         type="button"
+                                                                         onClick={() => toggleRecurringRule(item.id)}
+                                                                         disabled={calendarActionsDisabled}
+                                                                         className="inline-flex min-h-[44px] items-center gap-1 text-[10px] font-bold text-slate-500 transition-colors hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
+                                                                    >
+                                                                         {item.active ? <ToggleRight className="h-5 w-5 text-emerald-800" aria-hidden="true" /> : <ToggleLeft className="h-5 w-5 text-slate-500" aria-hidden="true" />}
+                                                                        {item.active ? 'Aktif' : 'Mati'}
+                                                                    </button>
+                                                                     <button
+                                                                         type="button"
+                                                                         onClick={() => requestDeleteRecurring(item)}
+                                                                         disabled={calendarActionsDisabled}
+                                                                         aria-label={`Hapus tagihan rutin ${item.title}`}
+                                                                         className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-600 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </section>
+                                    )}
+
+                                    {selectedDayReminders.length > 0 && (
+                                        <section aria-labelledby="reminder-agenda-heading">
+                                            <div className="mb-2 flex items-center justify-between gap-3">
+                                                <h3 id="reminder-agenda-heading" className="text-xs font-extrabold uppercase tracking-[0.12em] text-slate-700">Pengingat</h3>
+                                                <span className="text-[10px] font-bold text-slate-500">{completedReminderCount}/{selectedDayReminders.length} selesai</span>
+                                            </div>
+                                            <div className="divide-y divide-[#e2e9e3] overflow-hidden rounded-xl border border-[#e2e9e3]">
+                                                {selectedDayReminders.map((reminder) => {
+                                                    const meta = getReminderMeta(reminder.type);
+                                                    const ReminderIcon = meta.icon;
+                                                    const isCompleted = reminder.isCompleted;
+
+                                                    return (
+                                                        <div key={reminder.id} className={`p-3.5 ${isCompleted ? 'bg-slate-50/80' : meta.card}`}>
+                                                            <div className="flex items-start gap-3">
+                                                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${isCompleted ? 'border-slate-200 bg-slate-100 text-slate-500' : meta.iconBox}`}>
+                                                                    <ReminderIcon className="h-4 w-4" aria-hidden="true" />
+                                                                </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex items-start justify-between gap-2">
+                                                                        <div className="min-w-0">
+                                                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                                                <h4 className={`truncate text-xs font-bold ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{reminder.title}</h4>
+                                                                                {isCompleted && <span className="rounded-md bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">Selesai</span>}
+                                                                            </div>
+                                                                             <p className={`mt-0.5 text-[10px] font-semibold ${isCompleted ? 'text-slate-500' : 'text-slate-500'}`}>
+                                                                                {meta.label}{reminder.time ? ` • ${formatShortTime(reminder.time)}` : ''}
+                                                                            </p>
+                                                                        </div>
+                                                                        {reminder.type === 'finance' && reminder.amount !== null && reminder.amount !== undefined && (
+                                                                            <span className={`shrink-0 text-xs font-bold tabular-nums ${isCompleted ? 'text-slate-500' : 'text-amber-800'}`}>{fmtIDR(reminder.amount)}</span>
+                                                                        )}
+                                                                    </div>
+                                                                     {reminder.notes && <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">{reminder.notes}</p>}
+                                                                </div>
+                                                            </div>
+                                                            <div className="mt-3 flex items-center justify-between border-t border-[#e2e9e3] pt-2">
+                                                                 <button
+                                                                     type="button"
+                                                                     onClick={() => toggleReminder(reminder.id)}
+                                                                     disabled={calendarActionsDisabled}
+                                                                     aria-pressed={isCompleted}
+                                                                     className={`inline-flex min-h-[44px] items-center gap-1.5 text-[10px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60 ${isCompleted ? 'text-slate-500 hover:text-slate-800' : 'text-amber-800 hover:text-amber-900'}`}
+                                                                >
+                                                                    <span className={`flex h-5 w-5 items-center justify-center rounded-md border ${isCompleted ? 'border-emerald-700 bg-emerald-800 text-white' : 'border-amber-300 bg-white text-transparent'}`}>
+                                                                        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                                                                    </span>
+                                                                    {isCompleted ? 'Tandai belum selesai' : 'Tandai selesai'}
+                                                                </button>
+                                                                <div className="flex items-center gap-0.5">
+                                                                     <button
+                                                                         type="button"
+                                                                         onClick={() => openEditReminder(reminder)}
+                                                                         disabled={calendarActionsDisabled}
+                                                                         aria-label={`Edit pengingat ${reminder.title}`}
+                                                                         className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-amber-50 hover:text-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
+                                                                    >
+                                                                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                                                                    </button>
+                                                                     <button
+                                                                         type="button"
+                                                                         onClick={() => requestDeleteReminder(reminder)}
+                                                                         disabled={calendarActionsDisabled}
+                                                                         aria-label={`Hapus pengingat ${reminder.title}`}
+                                                                         className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-600 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </section>
+                                    )}
+                                </>
                             )}
-                        </div>
+                        </section>
 
-                        {/* Upcoming Bills panel */}
-                        <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col gap-4">
+                        <section className="flex flex-col gap-4 rounded-2xl border border-[#e2e9e3] bg-white p-4 shadow-sm sm:p-6" aria-labelledby="upcoming-heading">
                             <div>
-                                <h3 className="font-bold text-slate-800 text-base">Tagihan Terdekat (14 Hari)</h3>
-                                <p className="text-slate-500 text-xs mt-0.5">Proyeksi transaksi berulang dalam dua minggu ke depan.</p>
+                                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Fokus berikutnya</span>
+                                <h2 id="upcoming-heading" className="mt-1 text-base font-extrabold text-slate-900">Agenda rutin 14 hari ke depan</h2>
+                                <p className="mt-1 text-xs leading-relaxed text-slate-500">Pemasukan dan tagihan rutin yang perlu masuk dalam radar Anda.</p>
                             </div>
-
                             {upcomingBills.length === 0 ? (
-                                <p className="text-xs text-slate-400 py-4 text-center">Belum ada tagihan terdekat.</p>
+                                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center">
+                                     <p className="text-xs font-semibold text-slate-500">Belum ada agenda rutin terdekat.</p>
+                                     <p className="mt-1 text-[11px] text-slate-500">Agenda rutin yang aktif akan muncul di sini.</p>
+                                </div>
                             ) : (
-                                <div className="space-y-3.5 max-h-80 overflow-y-auto pr-1">
-                                    {upcomingBills.map(({ rule, date, daysRemaining }, idx) => (
-                                        <div key={idx} className="flex justify-between items-center gap-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                                                    rule.type === 'income' ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'
-                                                }`}>
-                                                    {rule.type === 'income' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                                <div className="divide-y divide-[#e2e9e3] overflow-y-auto rounded-xl border border-[#e2e9e3]">
+                                    {upcomingBills.map(({ rule, daysRemaining }) => (
+                                        <div key={`${rule.id}-${daysRemaining}`} className="flex items-center justify-between gap-3 p-3">
+                                            <div className="flex min-w-0 items-center gap-3">
+                                                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${rule.type === 'income' ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}>
+                                                    {rule.type === 'income' ? <ArrowUpRight className="h-4 w-4" aria-hidden="true" /> : <ArrowDownRight className="h-4 w-4" aria-hidden="true" />}
                                                 </div>
-                                                <div>
-                                                    <span className="text-xs font-bold text-slate-800 block leading-tight">{rule.title}</span>
-                                                    <span className="text-[10px] text-slate-400 font-bold block mt-0.5 uppercase tracking-wide">
-                                                        {daysRemaining === 0 ? 'Hari Ini' : daysRemaining === 1 ? 'Besok' : `${daysRemaining} hari lagi`}
+                                                <div className="min-w-0">
+                                                    <span className="block truncate text-xs font-bold text-slate-800">{rule.title}</span>
+                                                     <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                                        {daysRemaining === 0 ? 'Hari ini' : daysRemaining === 1 ? 'Besok' : `${daysRemaining} hari lagi`}
                                                     </span>
                                                 </div>
                                             </div>
-                                            
-                                            <span className={`text-xs font-bold ${
-                                                rule.type === 'income' ? 'text-emerald-800' : 'text-slate-700'
-                                            }`}>
-                                                {rule.type === 'income' ? '+' : '-'}{fmtIDR(rule.amount)}
+                                            <span className={`shrink-0 text-xs font-bold tabular-nums ${rule.type === 'income' ? 'text-emerald-800' : 'text-rose-800'}`}>
+                                                {getSignedAmount(rule.type, rule.amount)}
                                             </span>
                                         </div>
                                     ))}
                                 </div>
                             )}
-                        </div>
+                         </section>
 
+                        <section className="flex flex-col gap-4 rounded-2xl border border-[#e2e9e3] bg-white p-4 shadow-sm sm:p-6" aria-labelledby="recurring-management-heading">
+                            <div>
+                                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Kelola jadwal</span>
+                                <h2 id="recurring-management-heading" className="mt-1 text-base font-extrabold text-slate-900">Aturan transaksi rutin</h2>
+                                <p className="mt-1 text-xs leading-relaxed text-slate-500">Aktifkan atau nonaktifkan aturan tanpa menghapusnya.</p>
+                            </div>
+                            {recurringRules.length === 0 ? (
+                                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center">
+                                    <p className="text-xs font-semibold text-slate-500">Belum ada aturan rutin.</p>
+                                    <p className="mt-1 text-[11px] text-slate-500">Tambahkan aturan untuk mengatur transaksi berulang.</p>
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-[#e2e9e3] overflow-hidden rounded-xl border border-[#e2e9e3]">
+                                    {recurringRules.map((rule) => (
+                                        <div key={rule.id} className={`p-3.5 ${rule.active ? 'bg-white' : 'bg-slate-50/70'}`}>
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <h3 className={`truncate text-xs font-bold ${rule.active ? 'text-slate-800' : 'text-slate-500'}`}>{rule.title}</h3>
+                                                    <p className="mt-0.5 truncate text-[10px] font-semibold text-slate-500">
+                                                        {rule.type === 'income' ? 'Pemasukan' : 'Pengeluaran'} • {FREQ_LABELS[rule.frequency] || 'Rutin'} • {rule.nextDate ? formatDateID(rule.nextDate) : 'Tanggal belum diatur'}
+                                                    </p>
+                                                </div>
+                                                <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${rule.active ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>
+                                                    {rule.active ? 'Aktif' : 'Nonaktif'}
+                                                </span>
+                                            </div>
+                                            <div className="mt-2 flex items-center justify-between border-t border-[#e2e9e3] pt-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleRecurringRule(rule.id)}
+                                                    disabled={calendarActionsDisabled}
+                                                    aria-pressed={rule.active}
+                                                    className="inline-flex min-h-[44px] items-center gap-1.5 text-[10px] font-bold text-slate-600 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
+                                                >
+                                                    {rule.active ? <ToggleRight className="h-5 w-5 text-emerald-800" aria-hidden="true" /> : <ToggleLeft className="h-5 w-5 text-slate-500" aria-hidden="true" />}
+                                                    {rule.active ? 'Nonaktifkan' : 'Aktifkan'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => requestDeleteRecurring(rule)}
+                                                    disabled={calendarActionsDisabled}
+                                                    aria-label={`Hapus aturan rutin ${rule.title}`}
+                                                     className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-600 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
+                                                >
+                                                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </section>
                     </div>
-
                 </div>
-
             </div>
+
             <RecurringModal isOpen={isRecurringOpen} onClose={() => setIsRecurringOpen(false)} />
+            <ReminderModal
+                isOpen={isReminderOpen}
+                onClose={() => setIsReminderOpen(false)}
+                editing={editingReminder}
+                initialDate={getDateKey(currentYear, currentMonth, selectedDay)}
+            />
+            <Modal
+                isOpen={Boolean(deletingReminder)}
+                onClose={() => setDeletingReminder(null)}
+                title="Hapus pengingat"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm leading-relaxed text-slate-600">
+                        Hapus pengingat <strong className="font-bold text-slate-900">{deletingReminder?.title}</strong>? Tindakan ini tidak dapat dibatalkan.
+                    </p>
+                    {calendarError && (
+                        <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold leading-relaxed text-rose-800">
+                            {calendarError}
+                        </p>
+                    )}
+                    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button
+                            type="button"
+                            onClick={() => setDeletingReminder(null)}
+                            className="min-h-[44px] rounded-xl bg-slate-100 px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            type="button"
+                            onClick={confirmDeleteReminder}
+                            disabled={calendarBusy || syncLoading}
+                            className="min-h-[44px] rounded-xl bg-rose-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
+                        >
+                            {syncLoading ? 'Memuat...' : calendarBusy ? 'Menghapus...' : 'Hapus pengingat'}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+            <Modal
+                isOpen={Boolean(deletingRecurring)}
+                onClose={() => setDeletingRecurring(null)}
+                title="Hapus aturan rutin"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm leading-relaxed text-slate-600">
+                        Hapus aturan <strong className="font-bold text-slate-900">{deletingRecurring?.title}</strong>? Transaksi yang sudah tercatat tetap ada.
+                    </p>
+                    {calendarError && (
+                        <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold leading-relaxed text-rose-800">
+                            {calendarError}
+                        </p>
+                    )}
+                    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button
+                            type="button"
+                            onClick={() => setDeletingRecurring(null)}
+                            className="min-h-[44px] rounded-xl bg-slate-100 px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            type="button"
+                            onClick={confirmDeleteRecurring}
+                            disabled={calendarBusy || syncLoading}
+                            className="min-h-[44px] rounded-xl bg-rose-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
+                        >
+                            {syncLoading ? 'Memuat...' : calendarBusy ? 'Menghapus...' : 'Hapus aturan rutin'}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </AuthenticatedLayout>
     );
 }

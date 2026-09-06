@@ -1,7 +1,7 @@
 import React from 'react';
 
 export default function Button({ children, className = '', variant = 'primary', ...props }) {
-    const baseStyle = "px-4 py-2 rounded-xl font-medium transition-all duration-300 transform active:scale-95 flex items-center justify-center gap-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2";
+    const baseStyle = "min-h-9 px-3.5 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60";
     
     const variants = {
         primary: "bg-emerald-600 hover:bg-emerald-700 text-white focus:ring-emerald-500 shadow-emerald-200",

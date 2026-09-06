@@ -1,9 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { useAuth } from './AuthContext';
-import { advanceISO, currentMonthKey, daysAgoISO, dayOfMonthISO, FREQ_LABELS, monthKeyOf, todayISO, uid } from '../Utils/format';
+import { advanceISO, currentMonthKey, daysAgoISO, dayOfMonthISO, FREQ_LABELS, monthKeyOf, recurringTransactionId, todayISO, uid } from '../Utils/format';
 
 const STORAGE_KEY = 'sakupintar_finance_v1';
+const RECURRING_METADATA_KEY = 'sakupintar_recurring_metadata_v1';
 
 const CATEGORY_LABELS = {
     food: 'Makanan & Minuman',
@@ -135,6 +136,7 @@ const seedState = () => ({
     transactions: buildSeedTransactions(),
     budgets: { ...seedBudgets },
     recurringRules: buildSeedRules(),
+    reminders: [],
     savingsGoals: buildSeedSavingsGoals(),
     invitations: [
         {
@@ -154,18 +156,73 @@ const isValidState = (s) =>
     Array.isArray(s.transactions) && Array.isArray(s.recurringRules) &&
     typeof s.budgets === 'object';
 
+const readRecurringMetadata = (userId) => {
+    if (!userId) return {};
+    try {
+        const raw = localStorage.getItem(RECURRING_METADATA_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        return parsed[userId] || {};
+    } catch (error) {
+        console.warn('SakuPintar: gagal membaca metadata aturan rutin.', error);
+        return {};
+    }
+};
+
+const writeRecurringMetadata = (userId, ruleId, anchorDay) => {
+    if (!userId || !ruleId || !Number.isInteger(anchorDay)) return;
+    try {
+        const raw = localStorage.getItem(RECURRING_METADATA_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        parsed[userId] = { ...(parsed[userId] || {}), [ruleId]: anchorDay };
+        localStorage.setItem(RECURRING_METADATA_KEY, JSON.stringify(parsed));
+    } catch (error) {
+        console.warn('SakuPintar: gagal menyimpan metadata aturan rutin.', error);
+    }
+};
+
+const removeRecurringMetadata = (userId, ruleId) => {
+    if (!userId || !ruleId) return;
+    try {
+        const raw = localStorage.getItem(RECURRING_METADATA_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        if (!parsed[userId]) return;
+        delete parsed[userId][ruleId];
+        localStorage.setItem(RECURRING_METADATA_KEY, JSON.stringify(parsed));
+    } catch (error) {
+        console.warn('SakuPintar: gagal menghapus metadata aturan rutin.', error);
+    }
+};
+
+const emptyFinanceState = () => ({
+    wallets: [],
+    categories: seedCategories.map((category) => ({ ...category })),
+    transactions: [],
+    budgets: {},
+    recurringRules: [],
+    reminders: [],
+    savingsGoals: [],
+    invitations: [],
+});
+
 const processRecurring = (state) => {
     const today = todayISO();
     let changed = false;
     const txns = [...state.transactions];
+    const transactionIds = new Set(txns.map((transaction) => transaction.id));
+    const generatedTransactions = [];
+    const updatedRules = [];
     const rules = state.recurringRules.map((rule) => {
         if (!rule.active || !rule.nextDate) return rule;
         let next = rule.nextDate;
         let guard = 0;
-        const generated = [];
+        let generatedCount = 0;
+        const parsedAnchorDay = Number(rule.anchorDay);
+        const anchorDay = Number.isInteger(parsedAnchorDay) && parsedAnchorDay >= 1 && parsedAnchorDay <= 31
+            ? parsedAnchorDay
+            : Number(rule.nextDate.split('-')[2]);
         while (next <= today && guard < 400) {
-            generated.push({
-                id: uid(),
+            const transaction = {
+                id: recurringTransactionId(rule.id, next),
                 date: next,
                 time: '08:00',
                 title: rule.title,
@@ -175,16 +232,99 @@ const processRecurring = (state) => {
                 amount: rule.amount,
                 type: rule.type,
                 auto: true,
-            });
-            next = advanceISO(next, rule.frequency);
+            };
+            generatedCount += 1;
+            if (!transactionIds.has(transaction.id)) {
+                txns.push(transaction);
+                transactionIds.add(transaction.id);
+                generatedTransactions.push(transaction);
+            }
+            next = advanceISO(next, rule.frequency, anchorDay);
             guard++;
         }
-        if (generated.length === 0) return rule;
+        if (generatedCount === 0) return rule;
         changed = true;
-        txns.push(...generated);
-        return { ...rule, nextDate: next };
+        updatedRules.push({ id: rule.id, previousNextDate: rule.nextDate, nextDate: next });
+        return { ...rule, nextDate: next, anchorDay };
     });
-    return changed ? { ...state, transactions: txns, recurringRules: rules } : state;
+    return {
+        state: changed ? { ...state, transactions: txns, recurringRules: rules } : state,
+        generatedTransactions,
+        updatedRules,
+    };
+};
+
+const persistRecurringChanges = async (userId, { generatedTransactions, updatedRules }) => {
+    if (generatedTransactions.length > 0) {
+        const transactionResponses = await Promise.all(generatedTransactions.map((transaction) => (
+            supabase.from('transactions').insert([{
+                id: transaction.id,
+                user_id: userId,
+                title: transaction.title,
+                amount: Number(transaction.amount),
+                type: transaction.type,
+                category_id: transaction.categoryId,
+                wallet_id: transaction.walletId,
+                date: transaction.date,
+                time: transaction.time,
+                note: transaction.note,
+            }])
+        )));
+        const transactionError = transactionResponses.find((response) => response.error)?.error;
+        if (transactionError) throw transactionError;
+    }
+
+    if (updatedRules.length > 0) {
+        const ruleResponses = await Promise.all(updatedRules.map((rule) => (
+            supabase.from('recurring_rules')
+                .update({ next_date: rule.nextDate })
+                .eq('id', rule.id)
+                .eq('user_id', userId)
+                .select('id')
+        )));
+        const ruleError = ruleResponses.find((response) => response.error)?.error;
+        if (ruleError) throw ruleError;
+        const missingRule = ruleResponses.find((response) => !response.data || response.data.length === 0);
+        if (missingRule) throw new Error('Aturan rutin tidak ditemukan.');
+    }
+};
+
+const rollbackPersistedRecurringChanges = async (userId, { generatedTransactions, updatedRules }) => {
+    if (generatedTransactions.length > 0) {
+        const responses = await Promise.all(generatedTransactions.map((transaction) => (
+            supabase.from('transactions')
+                .delete()
+                .eq('id', transaction.id)
+                .eq('user_id', userId)
+        )));
+        const rollbackError = responses.find((response) => response.error)?.error;
+        if (rollbackError) throw rollbackError;
+    }
+
+    if (updatedRules.length === 0) return;
+    const responses = await Promise.all(updatedRules.map((rule) => (
+        supabase.from('recurring_rules')
+            .update({ next_date: rule.previousNextDate })
+            .eq('id', rule.id)
+            .eq('user_id', userId)
+    )));
+    const rollbackError = responses.find((response) => response.error)?.error;
+    if (rollbackError) throw rollbackError;
+};
+
+const nextRecurringDateFromToday = (nextDate, frequency, anchorDay) => {
+    const today = todayISO();
+    let next = nextDate;
+    let guard = 0;
+    const parsedAnchorDay = Number(anchorDay);
+    const stableAnchorDay = Number.isInteger(parsedAnchorDay) && parsedAnchorDay >= 1 && parsedAnchorDay <= 31
+        ? parsedAnchorDay
+        : Number(nextDate.split('-')[2]);
+    while (next < today && guard < 400) {
+        next = advanceISO(next, frequency, stableAnchorDay);
+        guard += 1;
+    }
+    return next < today ? today : next;
 };
 
 const loadInitialState = () => {
@@ -207,6 +347,7 @@ const loadInitialState = () => {
                         ...g,
                         history: Array.isArray(g.history) ? g.history : (g.current > 0 ? [{ id: uid(), date: todayISO(), amount: g.current, note: 'Saldo Awal' }] : [])
                     })),
+                    reminders: Array.isArray(parsed.reminders) ? parsed.reminders : [],
                     invitations: Array.isArray(parsed.invitations) ? parsed.invitations : seedState().invitations
                 };
             }
@@ -220,109 +361,178 @@ const loadInitialState = () => {
 export function FinanceProvider({ children }) {
     const [state, setState] = useState(loadInitialState);
     const { user } = useAuth();
-    const { wallets, categories, transactions, budgets, recurringRules, savingsGoals, invitations = [] } = state;
+    const { wallets, categories, transactions, budgets, recurringRules, reminders = [], savingsGoals, invitations = [] } = state;
+    const [syncAttempt, setSyncAttempt] = useState(0);
+    const [syncLoading, setSyncLoading] = useState(false);
+    const [syncError, setSyncError] = useState('');
+    const [calendarOperation, setCalendarOperation] = useState(null);
+    const [calendarError, setCalendarError] = useState('');
+
+    const retrySync = useCallback(() => setSyncAttempt((attempt) => attempt + 1), []);
+    const clearCalendarError = useCallback(() => setCalendarError(''), []);
 
     // ─── LocalStorage Fallback Backup ───
     useEffect(() => {
+        if (isSupabaseConfigured && user) return;
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         } catch (e) {
             console.warn('SakuPintar: gagal menyimpan data.', e);
         }
-    }, [state]);
+    }, [state, user]);
 
     // ─── Supabase Data Sync Loader ───
     useEffect(() => {
+        let cancelled = false;
+
         if (!isSupabaseConfigured || !user) {
+            setSyncLoading(false);
+            setSyncError('');
             setState(loadInitialState());
-            return;
+            return () => {
+                cancelled = true;
+            };
         }
+
+        setState(emptyFinanceState());
 
         const fetchSupabaseData = async () => {
             const userId = user.id;
+            const recurringMetadata = readRecurringMetadata(userId);
+            setSyncLoading(true);
+            setSyncError('');
 
-            const [
-                { data: walletsData },
-                { data: txnsData },
-                { data: budgetsData },
-                { data: savingsData },
-                { data: rulesData },
-                { data: invsData }
-            ] = await Promise.all([
-                supabase.from('wallets').select('*').eq('user_id', userId),
-                supabase.from('transactions').select('*').eq('user_id', userId),
-                supabase.from('category_budgets').select('*').eq('user_id', userId),
-                supabase.from('savings_goals').select('*').eq('user_id', userId),
-                supabase.from('recurring_rules').select('*').eq('user_id', userId),
-                supabase.from('savings_goal_invitations').select('*').eq('invitee_email', user.email.toLowerCase())
-            ]);
+            try {
+                const responses = await Promise.all([
+                    supabase.from('wallets').select('*').eq('user_id', userId),
+                    supabase.from('transactions').select('*').eq('user_id', userId),
+                    supabase.from('category_budgets').select('*').eq('user_id', userId),
+                    supabase.from('savings_goals').select('*').eq('user_id', userId),
+                    supabase.from('recurring_rules').select('*').eq('user_id', userId),
+                    supabase.from('reminders').select('*').eq('user_id', userId),
+                    supabase.from('savings_goal_invitations').select('*').eq('invitee_email', user.email.toLowerCase())
+                ]);
 
-            const budgetsObj = {};
-            if (budgetsData) {
-                budgetsData.forEach((b) => {
-                    budgetsObj[b.category_id] = Number(b.limit_amount);
-                });
+                const responseError = responses.find((response) => response.error)?.error;
+                if (responseError) throw responseError;
+                if (cancelled) return;
+
+                const [walletsResponse, txnsResponse, budgetsResponse, savingsResponse, rulesResponse, remindersResponse, invitationsResponse] = responses;
+                const walletsData = walletsResponse.data;
+                const txnsData = txnsResponse.data;
+                const budgetsData = budgetsResponse.data;
+                const savingsData = savingsResponse.data;
+                const rulesData = rulesResponse.data;
+                const remindersData = remindersResponse.data;
+                const invsData = invitationsResponse.data;
+
+                const budgetsObj = {};
+                if (budgetsData) {
+                    budgetsData.forEach((b) => {
+                        budgetsObj[b.category_id] = Number(b.limit_amount);
+                    });
+                }
+
+                const remoteState = {
+                    wallets: walletsData && walletsData.length > 0
+                        ? walletsData.map(w => ({ id: w.id, name: w.name, color: w.color, initialBalance: Number(w.balance) }))
+                        : seedWallets.map(w => ({ ...w })),
+                    categories: seedCategories.map(c => ({ ...c })),
+                    transactions: txnsData ? txnsData.map(t => ({
+                        id: t.id,
+                        title: t.title,
+                        amount: Number(t.amount),
+                        type: t.type,
+                        categoryId: t.category_id,
+                        walletId: t.wallet_id,
+                        fromWalletId: t.from_wallet_id,
+                        toWalletId: t.to_wallet_id,
+                        date: t.date,
+                        time: t.time,
+                        note: t.note,
+                        auto: t.auto,
+                    })) : [],
+                    budgets: Object.keys(budgetsObj).length > 0 ? budgetsObj : { ...seedBudgets },
+                    recurringRules: rulesData ? rulesData.map(r => ({
+                        id: r.id,
+                        title: r.title,
+                        amount: Number(r.amount),
+                        type: r.type,
+                        categoryId: r.category_id,
+                        walletId: r.wallet_id,
+                        frequency: r.frequency,
+                        nextDate: r.next_date,
+                        active: r.active,
+                        anchorDay: Number(recurringMetadata[r.id] || r.anchor_day) || Number(r.next_date?.split('-')[2]) || undefined,
+                    })) : [],
+                    reminders: remindersData ? remindersData.map(r => ({
+                        id: r.id,
+                        title: r.title,
+                        date: r.date,
+                        time: r.time,
+                        type: r.type,
+                        notes: r.notes,
+                        isCompleted: r.is_completed,
+                        amount: r.amount === null || r.amount === undefined ? null : Number(r.amount),
+                        createdAt: r.created_at,
+                        updatedAt: r.updated_at
+                    })) : [],
+                    savingsGoals: savingsData ? savingsData.map(g => ({
+                        id: g.id,
+                        title: g.title,
+                        target: Number(g.target),
+                        current: Number(g.current),
+                        deadlineISO: g.deadline_iso,
+                        history: g.history || [],
+                        isShared: g.is_shared,
+                        partnerEmail: g.partner_email
+                    })) : [],
+                    invitations: invsData ? invsData.map(inv => ({
+                        id: inv.id,
+                        goalId: inv.goal_id,
+                        inviterName: inv.inviter_name,
+                        inviterEmail: inv.inviter_email,
+                        inviteeEmail: inv.invitee_email,
+                        goalTitle: inv.goal_title,
+                        status: inv.status
+                    })) : []
+                };
+                const processed = processRecurring(remoteState);
+                if (cancelled) return;
+                setState(processed.state);
+                try {
+                    await persistRecurringChanges(userId, processed);
+                    if (cancelled) return;
+                } catch (error) {
+                    try {
+                        await rollbackPersistedRecurringChanges(userId, processed);
+                    } catch (rollbackError) {
+                        console.error('SakuPintar: gagal membatalkan transaksi rutin yang tersimpan.', rollbackError);
+                    }
+                    if (cancelled) return;
+                    setState(remoteState);
+                    throw error;
+                }
+            } catch (error) {
+                if (cancelled) return;
+                console.error('SakuPintar: gagal memuat data dari Supabase.', error);
+                setSyncError('Data kalender tidak dapat dimuat. Periksa koneksi Anda lalu coba lagi.');
+            } finally {
+                if (!cancelled) setSyncLoading(false);
             }
-
-            setState({
-                wallets: walletsData && walletsData.length > 0 
-                    ? walletsData.map(w => ({ id: w.id, name: w.name, color: w.color, initialBalance: Number(w.balance) }))
-                    : seedWallets.map(w => ({ ...w })),
-                categories: seedCategories.map(c => ({ ...c })),
-                transactions: txnsData ? txnsData.map(t => ({
-                    id: t.id,
-                    title: t.title,
-                    amount: Number(t.amount),
-                    type: t.type,
-                    categoryId: t.category_id,
-                    walletId: t.wallet_id,
-                    fromWalletId: t.from_wallet_id,
-                    toWalletId: t.to_wallet_id,
-                    date: t.date,
-                    time: t.time,
-                    note: t.note
-                })) : [],
-                budgets: Object.keys(budgetsObj).length > 0 ? budgetsObj : { ...seedBudgets },
-                recurringRules: rulesData ? rulesData.map(r => ({
-                    id: r.id,
-                    title: r.title,
-                    amount: Number(r.amount),
-                    type: r.type,
-                    categoryId: r.category_id,
-                    walletId: r.wallet_id,
-                    frequency: r.frequency,
-                    nextDate: r.next_date,
-                    active: r.active
-                })) : [],
-                savingsGoals: savingsData ? savingsData.map(g => ({
-                    id: g.id,
-                    title: g.title,
-                    target: Number(g.target),
-                    current: Number(g.current),
-                    deadlineISO: g.deadline_iso,
-                    history: g.history || [],
-                    isShared: g.is_shared,
-                    partnerEmail: g.partner_email
-                })) : [],
-                invitations: invsData ? invsData.map(inv => ({
-                    id: inv.id,
-                    goalId: inv.goal_id,
-                    inviterName: inv.inviter_name,
-                    inviterEmail: inv.inviter_email,
-                    inviteeEmail: inv.invitee_email,
-                    goalTitle: inv.goal_title,
-                    status: inv.status
-                })) : []
-            });
         };
 
         fetchSupabaseData();
-    }, [user]);
+        return () => {
+            cancelled = true;
+        };
+    }, [user, syncAttempt]);
 
     // Process recurring transactions
     useEffect(() => {
-        setState((s) => processRecurring(s));
-    }, []);
+        if (isSupabaseConfigured && user) return;
+        setState((s) => processRecurring(s).state);
+    }, [user]);
 
     const categoryById = useMemo(() => Object.fromEntries(categories.map((c) => [c.id, c])), [categories]);
     const walletById = useMemo(() => Object.fromEntries(wallets.map((w) => [w.id, w])), [wallets]);
@@ -536,11 +746,22 @@ export function FinanceProvider({ children }) {
 
     const addRecurringRule = useCallback(async (data) => {
         const newId = uid();
-        const rule = { ...data, id: newId, active: true };
+        const anchorDay = data.frequency === 'monthly' ? Number(data.nextDate.split('-')[2]) : undefined;
+        const rule = {
+            ...data,
+            id: newId,
+            active: true,
+            anchorDay,
+        };
+        setCalendarError('');
         setState((s) => ({ ...s, recurringRules: [...s.recurringRules, rule] }));
 
-        if (isSupabaseConfigured && user) {
-            await supabase.from('recurring_rules').insert([{
+        if (!isSupabaseConfigured || !user) return true;
+
+        writeRecurringMetadata(user.id, newId, anchorDay);
+        setCalendarOperation('recurring-add');
+        try {
+            const { error } = await supabase.from('recurring_rules').insert([{
                 id: newId,
                 user_id: user.id,
                 title: data.title,
@@ -552,34 +773,302 @@ export function FinanceProvider({ children }) {
                 next_date: data.nextDate,
                 active: true
             }]);
+            if (error) throw error;
+            return true;
+        } catch (error) {
+            let persistedRule = null;
+            try {
+                const response = await supabase.from('recurring_rules')
+                    .select('id')
+                    .eq('id', newId)
+                    .eq('user_id', user.id)
+                    .maybeSingle();
+                persistedRule = response.data;
+            } catch (lookupError) {
+                console.error('SakuPintar: gagal memverifikasi aturan rutin.', lookupError);
+            }
+            if (persistedRule) return true;
+            console.error('SakuPintar: gagal menyimpan aturan rutin.', error);
+            removeRecurringMetadata(user.id, newId);
+            setState((s) => ({ ...s, recurringRules: s.recurringRules.filter((r) => r.id !== newId) }));
+            setCalendarError('Aturan rutin gagal disimpan. Periksa koneksi Anda lalu coba lagi.');
+            return false;
+        } finally {
+            setCalendarOperation(null);
         }
     }, [user]);
 
     const toggleRecurringRule = useCallback(async (id) => {
-        let activeNext = false;
-        setState((s) => {
-            const rules = s.recurringRules.map((r) => {
-                if (r.id === id) {
-                    activeNext = !r.active;
-                    return { ...r, active: activeNext };
-                }
-                return r;
-            });
-            return { ...s, recurringRules: rules };
-        });
+        const previousRule = recurringRules.find((rule) => rule.id === id);
+        if (!previousRule) return false;
+        const activeNext = !previousRule.active;
+        const parsedAnchorDay = Number(previousRule.anchorDay);
+        const anchorDay = previousRule.frequency === 'monthly'
+            ? Number.isInteger(parsedAnchorDay) && parsedAnchorDay >= 1 && parsedAnchorDay <= 31
+                ? parsedAnchorDay
+                : Number(previousRule.nextDate?.split('-')[2])
+            : previousRule.anchorDay;
+        const nextDate = activeNext && previousRule.nextDate
+            ? nextRecurringDateFromToday(previousRule.nextDate, previousRule.frequency, anchorDay)
+            : previousRule.nextDate;
 
-        if (isSupabaseConfigured && user) {
-            await supabase.from('recurring_rules').update({ active: activeNext }).eq('id', id);
+        setCalendarError('');
+        setState((s) => ({
+            ...s,
+            recurringRules: s.recurringRules.map((rule) => (
+                rule.id === id ? { ...rule, active: activeNext, nextDate, anchorDay } : rule
+            )),
+        }));
+
+        if (!isSupabaseConfigured || !user) return true;
+
+        writeRecurringMetadata(user.id, id, anchorDay);
+        setCalendarOperation('recurring-toggle');
+        try {
+            const { data: updatedRules, error } = await supabase.from('recurring_rules')
+                .update({ active: activeNext, next_date: nextDate })
+                .eq('id', id)
+                .eq('user_id', user.id)
+                .select('id');
+            if (error) throw error;
+            if (!updatedRules || updatedRules.length === 0) throw new Error('Aturan rutin tidak ditemukan.');
+            return true;
+        } catch (error) {
+            console.error('SakuPintar: gagal mengubah status aturan rutin.', error);
+            setState((s) => ({
+                    ...s,
+                    recurringRules: s.recurringRules.map((rule) => (
+                    rule.id === id ? previousRule : rule
+                )),
+            }));
+            setCalendarError('Status aturan rutin gagal disimpan. Periksa koneksi Anda lalu coba lagi.');
+            return false;
+        } finally {
+            setCalendarOperation(null);
         }
-    }, [user]);
+    }, [user, recurringRules]);
 
     const deleteRecurringRule = useCallback(async (id) => {
+        const previousIndex = recurringRules.findIndex((rule) => rule.id === id);
+        const previousRule = previousIndex >= 0 ? recurringRules[previousIndex] : null;
+        if (!previousRule) return false;
+
+        setCalendarError('');
         setState((s) => ({ ...s, recurringRules: s.recurringRules.filter((r) => r.id !== id) }));
 
-        if (isSupabaseConfigured && user) {
-            await supabase.from('recurring_rules').delete().eq('id', id);
+        if (!isSupabaseConfigured || !user) return true;
+
+        setCalendarOperation('recurring-delete');
+        try {
+            const { data, error } = await supabase.from('recurring_rules')
+                .delete()
+                .eq('id', id)
+                .eq('user_id', user.id)
+                .select('id');
+            if (error) throw error;
+            if (!data || data.length === 0) throw new Error('Aturan rutin tidak ditemukan.');
+            removeRecurringMetadata(user.id, id);
+            return true;
+        } catch (error) {
+            console.error('SakuPintar: gagal menghapus aturan rutin.', error);
+            setState((s) => {
+                if (s.recurringRules.some((rule) => rule.id === id)) return s;
+                const rules = [...s.recurringRules];
+                rules.splice(Math.min(previousIndex, rules.length), 0, previousRule);
+                return { ...s, recurringRules: rules };
+            });
+            setCalendarError('Aturan rutin gagal dihapus. Periksa koneksi Anda lalu coba lagi.');
+            return false;
+        } finally {
+            setCalendarOperation(null);
+        }
+    }, [user, recurringRules]);
+
+    const addReminder = useCallback(async (data) => {
+        const newId = uid();
+        const reminder = {
+            id: newId,
+            title: String(data.title || '').trim(),
+            date: data.date,
+            time: data.time || null,
+            type: data.type,
+            notes: data.notes ? String(data.notes).trim() : null,
+            isCompleted: false,
+            amount: data.type === 'finance' && data.amount !== '' && data.amount !== null && data.amount !== undefined
+                ? Number(data.amount)
+                : null,
+        };
+
+        setCalendarError('');
+        setState((s) => ({ ...s, reminders: [reminder, ...(s.reminders || [])] }));
+
+        if (!isSupabaseConfigured || !user) return true;
+
+        setCalendarOperation('reminder-add');
+        try {
+            const { error } = await supabase.from('reminders').insert([{
+                id: newId,
+                user_id: user.id,
+                title: reminder.title,
+                date: reminder.date,
+                time: reminder.time,
+                type: reminder.type,
+                notes: reminder.notes,
+                is_completed: false,
+                amount: reminder.amount,
+            }]);
+            if (error) throw error;
+            return true;
+        } catch (error) {
+            let persistedReminder = null;
+            try {
+                const response = await supabase.from('reminders')
+                    .select('id')
+                    .eq('id', newId)
+                    .eq('user_id', user.id)
+                    .maybeSingle();
+                persistedReminder = response.data;
+            } catch (lookupError) {
+                console.error('SakuPintar: gagal memverifikasi pengingat.', lookupError);
+            }
+            if (persistedReminder) return true;
+            console.error('SakuPintar: gagal menyimpan pengingat.', error);
+            setState((s) => ({ ...s, reminders: (s.reminders || []).filter((item) => item.id !== newId) }));
+            setCalendarError('Pengingat gagal disimpan. Periksa koneksi Anda lalu coba lagi.');
+            return false;
+        } finally {
+            setCalendarOperation(null);
         }
     }, [user]);
+
+    const updateReminder = useCallback(async (id, data) => {
+        const previousReminder = reminders.find((reminder) => reminder.id === id);
+        if (!previousReminder) return false;
+        const changes = {
+            title: String(data.title || '').trim(),
+            date: data.date,
+            time: data.time || null,
+            type: data.type,
+            notes: data.notes ? String(data.notes).trim() : null,
+            amount: data.type === 'finance' && data.amount !== '' && data.amount !== null && data.amount !== undefined
+                ? Number(data.amount)
+                : null,
+        };
+        const completionChange = data.isCompleted === undefined ? {} : { isCompleted: data.isCompleted };
+
+        setCalendarError('');
+        setState((s) => ({
+            ...s,
+            reminders: (s.reminders || []).map((r) => (
+                r.id === id ? { ...r, ...changes, ...completionChange } : r
+            )),
+        }));
+
+        if (!isSupabaseConfigured || !user) return true;
+
+        setCalendarOperation('reminder-update');
+        try {
+            const { data: updatedReminders, error } = await supabase.from('reminders').update({
+                title: changes.title,
+                date: changes.date,
+                time: changes.time,
+                type: changes.type,
+                notes: changes.notes,
+                amount: changes.amount,
+                ...(data.isCompleted === undefined ? {} : { is_completed: data.isCompleted }),
+            }).eq('id', id).eq('user_id', user.id).select('id');
+            if (error) throw error;
+            if (!updatedReminders || updatedReminders.length === 0) throw new Error('Pengingat tidak ditemukan.');
+            return true;
+        } catch (error) {
+            console.error('SakuPintar: gagal memperbarui pengingat.', error);
+            setState((s) => ({
+                ...s,
+                reminders: (s.reminders || []).map((reminder) => (
+                    reminder.id === id ? previousReminder : reminder
+                )),
+            }));
+            setCalendarError('Pengingat gagal diperbarui. Periksa koneksi Anda lalu coba lagi.');
+            return false;
+        } finally {
+            setCalendarOperation(null);
+        }
+    }, [user, reminders]);
+
+    const toggleReminder = useCallback(async (id) => {
+        const previousReminder = reminders.find((reminder) => reminder.id === id);
+        if (!previousReminder) return false;
+        const isCompletedNext = !previousReminder.isCompleted;
+
+        setCalendarError('');
+        setState((s) => ({
+            ...s,
+            reminders: (s.reminders || []).map((reminder) => (
+                reminder.id === id ? { ...reminder, isCompleted: isCompletedNext } : reminder
+            )),
+        }));
+
+        if (!isSupabaseConfigured || !user) return true;
+
+        setCalendarOperation('reminder-toggle');
+        try {
+            const { data: updatedReminders, error } = await supabase.from('reminders')
+                .update({ is_completed: isCompletedNext })
+                .eq('id', id)
+                .eq('user_id', user.id)
+                .select('id');
+            if (error) throw error;
+            if (!updatedReminders || updatedReminders.length === 0) throw new Error('Pengingat tidak ditemukan.');
+            return true;
+        } catch (error) {
+            console.error('SakuPintar: gagal mengubah status pengingat.', error);
+            setState((s) => ({
+                ...s,
+                reminders: (s.reminders || []).map((reminder) => (
+                    reminder.id === id ? previousReminder : reminder
+                )),
+            }));
+            setCalendarError('Status pengingat gagal disimpan. Periksa koneksi Anda lalu coba lagi.');
+            return false;
+        } finally {
+            setCalendarOperation(null);
+        }
+    }, [user, reminders]);
+
+    const deleteReminder = useCallback(async (id) => {
+        const previousIndex = reminders.findIndex((reminder) => reminder.id === id);
+        const previousReminder = previousIndex >= 0 ? reminders[previousIndex] : null;
+        if (!previousReminder) return false;
+
+        setCalendarError('');
+        setState((s) => ({ ...s, reminders: (s.reminders || []).filter((r) => r.id !== id) }));
+
+        if (!isSupabaseConfigured || !user) return true;
+
+        setCalendarOperation('reminder-delete');
+        try {
+            const { data: deletedReminders, error } = await supabase.from('reminders')
+                .delete()
+                .eq('id', id)
+                .eq('user_id', user.id)
+                .select('id');
+            if (error) throw error;
+            if (!deletedReminders || deletedReminders.length === 0) throw new Error('Pengingat tidak ditemukan.');
+            return true;
+        } catch (error) {
+            console.error('SakuPintar: gagal menghapus pengingat.', error);
+            setState((s) => {
+                if ((s.reminders || []).some((reminder) => reminder.id === id)) return s;
+                const nextReminders = [...(s.reminders || [])];
+                nextReminders.splice(Math.min(previousIndex, nextReminders.length), 0, previousReminder);
+                return { ...s, reminders: nextReminders };
+            });
+            setCalendarError('Pengingat gagal dihapus. Periksa koneksi Anda lalu coba lagi.');
+            return false;
+        } finally {
+            setCalendarOperation(null);
+        }
+    }, [user, reminders]);
 
     const addSavingsGoal = useCallback(async (data) => {
         const newId = uid();
@@ -760,18 +1249,31 @@ export function FinanceProvider({ children }) {
     }, [user]);
 
     const resetData = useCallback(async () => {
+        setCalendarError('');
         if (isSupabaseConfigured && user) {
             const userId = user.id;
-            await supabase.from('transactions').delete().eq('user_id', userId);
-            await supabase.from('wallets').delete().eq('user_id', userId);
-            await supabase.from('category_budgets').delete().eq('user_id', userId);
-            await supabase.from('savings_goals').delete().eq('user_id', userId);
-            await supabase.from('recurring_rules').delete().eq('user_id', userId);
-            await supabase.from('savings_goal_invitations').delete().or(`inviter_email.eq.${user.email},invitee_email.eq.${user.email}`);
+            try {
+                const responses = await Promise.all([
+                    supabase.from('transactions').delete().eq('user_id', userId),
+                    supabase.from('wallets').delete().eq('user_id', userId),
+                    supabase.from('category_budgets').delete().eq('user_id', userId),
+                    supabase.from('savings_goals').delete().eq('user_id', userId),
+                    supabase.from('recurring_rules').delete().eq('user_id', userId),
+                    supabase.from('reminders').delete().eq('user_id', userId),
+                    supabase.from('savings_goal_invitations').delete().or(`inviter_email.eq.${user.email},invitee_email.eq.${user.email}`),
+                ]);
+                const responseError = responses.find((response) => response.error)?.error;
+                if (responseError) throw responseError;
+            } catch (error) {
+                console.error('SakuPintar: gagal mereset data.', error);
+                setCalendarError('Data belum berhasil direset. Periksa koneksi Anda lalu coba lagi.');
+                return false;
+            }
         }
 
         localStorage.removeItem(STORAGE_KEY);
         setState(seedState());
+        return true;
     }, [user]);
 
     const getWalletBalance = useCallback((walletId) => {
@@ -827,12 +1329,15 @@ export function FinanceProvider({ children }) {
         return alerts.sort((a, b) => b.pct - a.pct);
     }, [categories, budgets, getCategoryMonthSpend]);
 
+    const calendarBusy = Boolean(calendarOperation);
+
     const value = useMemo(() => ({
         wallets,
         categories,
         transactions: sortedTransactions,
         budgets,
         recurringRules,
+        reminders,
         savingsGoals,
         invitations,
         categoryById,
@@ -851,6 +1356,10 @@ export function FinanceProvider({ children }) {
         addRecurringRule,
         toggleRecurringRule,
         deleteRecurringRule,
+        addReminder,
+        updateReminder,
+        toggleReminder,
+        deleteReminder,
         addSavingsGoal,
         deleteSavingsGoal,
         addSavingsGoalDeposit,
@@ -865,15 +1374,23 @@ export function FinanceProvider({ children }) {
         getCategoryMonthSpend,
         getCategoryMonthCount,
         getBudgetAlerts,
+        syncLoading,
+        syncError,
+        retrySync,
+        calendarBusy,
+        calendarError,
+        clearCalendarError,
     }), [
-        wallets, categories, sortedTransactions, budgets, recurringRules, savingsGoals, invitations, categoryById, walletById,
+        wallets, categories, sortedTransactions, budgets, recurringRules, reminders, savingsGoals, invitations, categoryById, walletById,
         addTransaction, updateTransaction, deleteTransaction, addTransfer,
         addWallet, updateWallet, deleteWallet,
         addCategory, updateCategory, deleteCategory, setBudget,
         addRecurringRule, toggleRecurringRule, deleteRecurringRule,
+        addReminder, updateReminder, toggleReminder, deleteReminder,
         addSavingsGoal, deleteSavingsGoal, addSavingsGoalDeposit, deleteSavingsGoalDeposit,
         updateSavingsGoalSharing, acceptSavingsGoalInvitation, rejectSavingsGoalInvitation, resetData,
         getWalletBalance, totalBalance, monthStats, getCategoryMonthSpend, getCategoryMonthCount, getBudgetAlerts,
+        syncLoading, syncError, retrySync, calendarBusy, calendarError, clearCalendarError,
     ]);
 
     return <FinanceContext.Provider value={value}>{children}</FinanceContext.Provider>;

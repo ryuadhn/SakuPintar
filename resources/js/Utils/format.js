@@ -23,6 +23,22 @@ export const dayOfMonthISO = (day) => {
     return toISODate(d);
 };
 
+const hashRecurringIdPart = (value, seed) => {
+    let hash = seed;
+    for (let index = 0; index < value.length; index += 1) {
+        hash = Math.imul(hash ^ value.charCodeAt(index), 16777619);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+};
+
+export const recurringTransactionId = (ruleId, date) => {
+    const input = `${ruleId}:${date}`;
+    const hex = [2166136261, 2246822519, 3266489917, 668265263]
+        .map((seed) => hashRecurringIdPart(input, seed))
+        .join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+};
+
 export const formatDateID = (iso) => {
     if (!iso) return '';
     const [y, m, d] = iso.split('-').map(Number);
@@ -50,12 +66,21 @@ export const addYearsISO = (n) => {
 
 export const monthKeyOf = (iso) => (iso || '').slice(0, 7);
 
-export const advanceISO = (iso, frequency) => {
+export const advanceISO = (iso, frequency, anchorDay = null) => {
     const [y, m, d] = iso.split('-').map(Number);
     const date = new Date(y, m - 1, d);
     if (frequency === 'daily') date.setDate(date.getDate() + 1);
     else if (frequency === 'weekly') date.setDate(date.getDate() + 7);
-    else date.setMonth(date.getMonth() + 1);
+    else {
+        const nextMonth = date.getMonth() + 1;
+        const lastDayOfNextMonth = new Date(date.getFullYear(), nextMonth + 1, 0).getDate();
+        const scheduledDay = Number.isInteger(anchorDay) ? anchorDay : date.getDate();
+        return toISODate(new Date(
+            date.getFullYear(),
+            nextMonth,
+            Math.min(scheduledDay, lastDayOfNextMonth),
+        ));
+    }
     return toISODate(date);
 };
 
