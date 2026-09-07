@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Utensils, Car, ShoppingBag, Clapperboard, FileText, HeartPulse, Wallet, Banknote } from 'lucide-react';
+import { Utensils, Car, ShoppingBag, Clapperboard, FileText, HeartPulse, Wallet, Banknote, Receipt, Tags } from 'lucide-react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import CategoryCard from '../Components/Categories/CategoryCard';
 import CategoryModal from '../Components/Categories/CategoryModal';
@@ -32,6 +32,7 @@ export default function Categories() {
         categories, budgets,
         getCategoryMonthSpend, getCategoryMonthCount,
         monthStats,
+        transactions,
     } = useFinance();
 
     const [modalOpen, setModalOpen] = useState(false);
@@ -54,14 +55,14 @@ export default function Categories() {
 
     return (
         <AuthenticatedLayout>
-            <div className="max-w-7xl mx-auto space-y-8">
+            <div className="app-page">
                 {/* Header Section */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="app-page-header">
                     <div>
-                        <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight">Kelola Kategori</h1>
-                        <p className="text-sm text-slate-500 mt-0.5">Kelola kategori pengeluaran Anda dan atur batas anggaran bulanan.</p>
+                        <h1 className="app-page-title">Kategori</h1>
+                        <p className="app-page-description">Kelola kategori pengeluaran Anda dan atur batas anggaran bulanan.</p>
                     </div>
-                    <Button variant="primary" onClick={openAdd} className="bg-emerald-600 hover:bg-emerald-700 shadow-md font-bold text-sm px-5 py-3">
+                    <Button variant="primary" onClick={openAdd} className="shrink-0">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                         </svg>
@@ -70,20 +71,35 @@ export default function Categories() {
                 </div>
 
                 {/* Summary strip */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                    <div className="rounded-2xl p-5 bg-white border border-slate-100 shadow-sm">
-                        <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Total Anggaran Bulanan</span>
-                        <h3 className="text-xl font-bold text-slate-800 mt-1">{fmtIDR(totalBudget)}</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="ui-stat-card flex min-w-0 items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-800">
+                            <Wallet className="h-4 w-4" aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0">
+                            <span className="block text-xs font-medium text-slate-500">Total anggaran bulanan</span>
+                            <span className="mt-0.5 block truncate text-base font-semibold text-slate-800">{fmtIDR(totalBudget)}</span>
+                        </div>
                     </div>
-                    <div className="rounded-2xl p-5 bg-white border border-slate-100 shadow-sm">
-                        <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Terpakai Bulan Ini</span>
-                        <h3 className={`text-xl font-bold mt-1 ${stats.expense > totalBudget ? 'text-red-600' : 'text-slate-800'}`}>
-                            {fmtIDR(stats.expense)}
-                        </h3>
+                    <div className="ui-stat-card flex min-w-0 items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-800">
+                            <Receipt className="h-4 w-4" aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0">
+                            <span className="block text-xs font-medium text-slate-500">Terpakai bulan ini</span>
+                            <span className={`mt-0.5 block truncate text-base font-semibold ${totalBudget > 0 && stats.expense > totalBudget ? 'text-rose-800' : 'text-slate-800'}`}>
+                                {fmtIDR(stats.expense)}
+                            </span>
+                        </div>
                     </div>
-                    <div className="rounded-2xl p-5 bg-white border border-slate-100 shadow-sm">
-                        <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Kategori Aktif</span>
-                        <h3 className="text-xl font-bold text-slate-800 mt-1">{expenseCategories.length} Pengeluaran &middot; {incomeCategories.length} Pemasukan</h3>
+                    <div className="ui-stat-card flex min-w-0 items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-700">
+                            <Tags className="h-4 w-4" aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0">
+                            <span className="block text-xs font-medium text-slate-500">Kategori aktif</span>
+                            <span className="mt-0.5 block truncate text-base font-semibold text-slate-800">{expenseCategories.length} pengeluaran &middot; {incomeCategories.length} pemasukan</span>
+                        </div>
                     </div>
                 </div>
 
@@ -91,7 +107,7 @@ export default function Categories() {
                 <BudgetAlertBanner />
 
                 {/* Categories Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {expenseCategories.map((cat) => (
                         <CategoryCard
                             key={cat.id}
@@ -105,24 +121,31 @@ export default function Categories() {
                         />
                     ))}
                     {expenseCategories.length === 0 && (
-                        <p className="text-sm text-slate-500 col-span-full py-10 text-center bg-white rounded-2xl border border-dashed border-slate-200">
-                            Belum ada kategori pengeluaran. Klik "Tambah Kategori" untuk memulai.
-                        </p>
+                        <div className="ui-empty col-span-full flex flex-col items-center gap-3">
+                            <div>
+                                <p className="font-semibold text-slate-700">Belum ada kategori pengeluaran.</p>
+                                <p className="mt-1 text-xs leading-relaxed text-slate-500">Tambahkan kategori untuk mulai mengatur batas anggaran.</p>
+                            </div>
+                            <Button variant="secondary" onClick={openAdd} className="min-h-8 px-3 text-xs">
+                                Tambah kategori
+                            </Button>
+                        </div>
                     )}
                 </div>
 
                 {/* Income categories strip */}
                 {incomeCategories.length > 0 && (
                     <div>
-                        <h3 className="text-zinc-900 text-base font-bold mb-3 flex items-center gap-2">
+                        <h3 className="ui-section-title mb-3 flex items-center gap-2">
                             <Banknote className="w-4 h-4 text-emerald-700" /> Kategori Pemasukan
                         </h3>
                         <div className="flex flex-wrap gap-3">
                             {incomeCategories.map((cat) => (
                                 <button
                                     key={cat.id}
+                                    type="button"
                                     onClick={() => openEdit(cat)}
-                                    className={`px-4 py-2 rounded-full text-xs font-bold transition-transform active:scale-95 ${cat.badge}`}
+                                    className={`ui-badge rounded-full transition-colors ${cat.badge}`}
                                 >
                                     {cat.name}
                                 </button>
@@ -132,7 +155,7 @@ export default function Categories() {
                 )}
 
                 {/* AI Spending Habits Banner */}
-                <AIHabitBanner />
+                <AIHabitBanner categories={categories} transactions={transactions} />
             </div>
 
             {/* Add / Edit Modal */}

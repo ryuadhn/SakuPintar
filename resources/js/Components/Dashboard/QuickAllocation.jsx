@@ -27,49 +27,51 @@ export default function QuickAllocation({ transactions = [], categories = [] }) 
     const hasData = items.length > 0;
 
     return (
-        <div className="self-stretch px-8 pt-8 pb-10 bg-white rounded-2xl outline outline-1 outline-offset-[-1px] outline-stone-300 flex flex-col justify-start items-start gap-6 shadow-sm h-full">
+        <div className="ui-card self-stretch p-5 flex flex-col justify-start items-start gap-4">
             <div className="self-stretch flex flex-col justify-start items-start">
-                <h3 className="text-zinc-900 text-lg font-bold tracking-tight">Alokasi Pengeluaran</h3>
+                <h3 className="ui-section-title">Alokasi Pengeluaran</h3>
                 <p className="text-slate-500 text-sm mt-0.5">Kategori terbesar bulan ini.</p>
             </div>
             
-            <div className="self-stretch flex flex-col justify-start items-start gap-6 w-full">
-                <div className="self-stretch flex flex-col gap-4">
-                    {hasData ? items.map((item) => (
-                        <div key={item.id} className="self-stretch inline-flex justify-between items-center gap-3">
-                            <div className="flex justify-start items-center gap-3 min-w-0">
-                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} aria-hidden="true" />
-                                <span className="text-slate-600 text-base font-normal truncate">{item.name}</span>
-                            </div>
-                            <span className="text-zinc-900 text-base font-bold shrink-0">{item.pct}%</span>
+                <div className="self-stretch flex flex-col justify-start items-start gap-4 w-full">
+                {hasData ? (
+                    <>
+                        <div className="self-stretch flex flex-col gap-3">
+                            {items.map((item) => (
+                                <div key={item.id} className="self-stretch inline-flex justify-between items-center gap-3">
+                                    <div className="flex justify-start items-center gap-3 min-w-0">
+                                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} aria-hidden="true" />
+                                        <span className="text-slate-600 text-sm font-normal truncate">{item.name}</span>
+                                    </div>
+                                    <span className="text-zinc-900 text-sm font-semibold shrink-0">{item.pct}%</span>
+                                </div>
+                            ))}
                         </div>
-                    )) : (
-                        <p className="text-sm text-slate-500 leading-6">
-                            Belum ada pengeluaran bulan ini.
-                        </p>
-                    )}
-                </div>
 
-                <div className="self-stretch pt-6 border-t border-stone-200 flex flex-col justify-start items-start gap-4 w-full">
-                    <div className="self-stretch h-3 bg-stone-100 rounded-full flex overflow-hidden w-full">
-                        {hasData && items.map((item) => (
-                            <div
-                                key={item.id}
-                                className="h-full"
-                                style={{ width: `${item.pct}%`, backgroundColor: item.color }}
-                                title={`${item.name}: ${item.pct}%`}
-                            />
-                        ))}
-                    </div>
+                        <div className="self-stretch pt-4 border-t border-stone-200 flex flex-col justify-start items-start gap-3 w-full">
+                            <div className="self-stretch h-2.5 bg-stone-100 rounded-full flex overflow-hidden w-full">
+                                {items.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className="h-full"
+                                        style={{ width: `${item.pct}%`, backgroundColor: item.color }}
+                                        title={`${item.name}: ${item.pct}%`}
+                                    />
+                                ))}
+                            </div>
 
-                    <div className="self-stretch flex flex-col justify-start items-center text-center">
-                        <p className="text-slate-500 text-xs font-normal leading-4">
-                            {hasData
-                                ? `Terbesar: ${items[0].name} (${fmtIDR(items[0].value)})`
-                                : 'Statistik muncul setelah ada transaksi pengeluaran.'}
-                        </p>
+                            <div className="self-stretch flex flex-col justify-start items-center text-center">
+                                <p className="text-slate-500 text-xs font-normal leading-4">
+                                    Terbesar: {items[0].name} ({fmtIDR(items[0].value)})
+                                </p>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <div className="flex min-h-20 w-full items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-4 text-center">
+                        <p className="text-xs leading-relaxed text-slate-500">Belum ada pengeluaran bulan ini.</p>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );

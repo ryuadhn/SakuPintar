@@ -5,6 +5,11 @@ import { advanceISO, currentMonthKey, daysAgoISO, dayOfMonthISO, FREQ_LABELS, mo
 
 const STORAGE_KEY = 'sakupintar_finance_v1';
 const RECURRING_METADATA_KEY = 'sakupintar_recurring_metadata_v1';
+const REMINDER_PRIORITIES = new Set(['low', 'medium', 'high']);
+
+const normalizeReminderPriority = (priority) => (
+    REMINDER_PRIORITIES.has(priority) ? priority : null
+);
 
 const CATEGORY_LABELS = {
     food: 'Makanan & Minuman',
@@ -472,7 +477,8 @@ export function FinanceProvider({ children }) {
                         time: r.time,
                         type: r.type,
                         notes: r.notes,
-                        isCompleted: r.is_completed,
+                        priority: normalizeReminderPriority(r.priority),
+                        isCompleted: Boolean(r.is_completed),
                         amount: r.amount === null || r.amount === undefined ? null : Number(r.amount),
                         createdAt: r.created_at,
                         updatedAt: r.updated_at
@@ -516,7 +522,7 @@ export function FinanceProvider({ children }) {
             } catch (error) {
                 if (cancelled) return;
                 console.error('SakuPintar: gagal memuat data dari Supabase.', error);
-                setSyncError('Data kalender tidak dapat dimuat. Periksa koneksi Anda lalu coba lagi.');
+                setSyncError('Data kalender dan tugas tidak dapat dimuat. Periksa koneksi Anda lalu coba lagi.');
             } finally {
                 if (!cancelled) setSyncLoading(false);
             }
@@ -893,6 +899,7 @@ export function FinanceProvider({ children }) {
             time: data.time || null,
             type: data.type,
             notes: data.notes ? String(data.notes).trim() : null,
+            priority: data.type === 'task' ? normalizeReminderPriority(data.priority) : null,
             isCompleted: false,
             amount: data.type === 'finance' && data.amount !== '' && data.amount !== null && data.amount !== undefined
                 ? Number(data.amount)
@@ -914,6 +921,7 @@ export function FinanceProvider({ children }) {
                 time: reminder.time,
                 type: reminder.type,
                 notes: reminder.notes,
+                priority: reminder.priority,
                 is_completed: false,
                 amount: reminder.amount,
             }]);
@@ -950,6 +958,7 @@ export function FinanceProvider({ children }) {
             time: data.time || null,
             type: data.type,
             notes: data.notes ? String(data.notes).trim() : null,
+            priority: data.type === 'task' ? normalizeReminderPriority(data.priority) : null,
             amount: data.type === 'finance' && data.amount !== '' && data.amount !== null && data.amount !== undefined
                 ? Number(data.amount)
                 : null,
@@ -974,6 +983,7 @@ export function FinanceProvider({ children }) {
                 time: changes.time,
                 type: changes.type,
                 notes: changes.notes,
+                priority: changes.priority,
                 amount: changes.amount,
                 ...(data.isCompleted === undefined ? {} : { is_completed: data.isCompleted }),
             }).eq('id', id).eq('user_id', user.id).select('id');

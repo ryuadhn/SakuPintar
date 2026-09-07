@@ -2,26 +2,23 @@ import React from 'react';
 
 export default function TransactionTable({ children }) {
     return (
-        <div className="self-stretch bg-white rounded-2xl outline outline-1 outline-offset-[-1px] outline-stone-300 flex flex-col justify-start items-start overflow-hidden shadow-sm">
+        <div className="ui-card self-stretch p-0 flex flex-col justify-start items-start overflow-hidden">
             {/* Table Header Section */}
-            <div className="self-stretch px-8 py-8 border-b border-stone-300 flex justify-between items-center bg-white flex-wrap gap-4">
+            <div className="self-stretch px-6 py-4 border-b border-stone-300 flex items-center bg-white flex-wrap gap-3">
                 <div className="flex flex-col justify-start items-start">
-                    <h3 className="text-zinc-900 text-base font-bold leading-6">Aktivitas Terakhir</h3>
+                    <h3 className="ui-section-title">Aktivitas Terakhir</h3>
                 </div>
-                <button className="px-4 py-2 bg-stone-100 hover:bg-stone-200 transition-colors rounded-xl outline outline-1 outline-offset-[-1px] outline-stone-300 text-zinc-900 text-sm font-semibold tracking-wide active:scale-[0.98]">
-                    Download Report
-                </button>
             </div>
 
             {/* Table Area */}
             <div className="self-stretch w-full overflow-x-auto">
                 <table className="w-full min-w-[700px] table-auto text-left">
                     <thead>
-                        <tr className="bg-stone-100 border-b border-stone-200 text-[10px] font-bold uppercase text-slate-600 tracking-wide">
-                            <th className="py-4 px-8 w-1/2">PENERIMA / DESKRIPSI</th>
-                            <th className="py-4 px-8">KATEGORI</th>
-                            <th className="py-4 px-8">TANGGAL</th>
-                            <th className="py-4 px-8 text-right">JUMLAH</th>
+                        <tr className="bg-stone-50 border-b border-stone-200 text-xs font-medium text-slate-600">
+                            <th className="py-3 px-6 w-1/2">Penerima / deskripsi</th>
+                            <th className="py-3 px-6">Kategori</th>
+                            <th className="py-3 px-6">Tanggal</th>
+                            <th className="py-3 px-6 text-right">Jumlah</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-200">

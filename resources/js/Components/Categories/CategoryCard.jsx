@@ -42,23 +42,25 @@ export default function CategoryCard({ name, count = 0, limit, spent = 0, icon: 
     const scheme = colors[colorClass] || colors.emerald;
 
     return (
-        <div className={`bg-white border border-slate-100 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md ${scheme.lightBg}`}>
-            <div className="flex justify-between items-start mb-4">
+        <div className={`ui-card p-4 transition-colors duration-200 ${scheme.lightBg}`}>
+            <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center gap-3">
                     {Icon && (
-                        <div className={`p-3 rounded-xl ${scheme.bg}`}>
-                            <Icon className="w-5 h-5" />
+                        <div className={`p-2.5 rounded-lg ${scheme.bg}`}>
+                            <Icon className="w-4 h-4" />
                         </div>
                     )}
                     <div>
-                        <h4 className="font-bold text-slate-800 text-sm">{name}</h4>
-                        <span className="text-[11px] text-slate-400 font-medium">{count} Transaksi</span>
+                        <h4 className="font-semibold text-slate-800 text-sm">{name}</h4>
+                        <span className="text-xs font-normal text-slate-400">{count} transaksi</span>
                     </div>
                 </div>
                 {onEdit && (
                     <button
+                        type="button"
                         onClick={onEdit}
-                        className="p-2 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                        className="ui-icon-button"
+                        aria-label={`Kelola kategori ${name} dan anggaran`}
                         title="Kelola kategori & anggaran"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -70,22 +72,29 @@ export default function CategoryCard({ name, count = 0, limit, spent = 0, icon: 
             </div>
 
             {limit && (
-                <div className="space-y-2 mt-4">
-                    <div className="flex justify-between text-[11px] font-semibold">
-                        <span className="text-slate-400">Batas Bulanan</span>
+                <div className="space-y-1.5 mt-3">
+                    <div className="flex justify-between text-xs font-medium">
+                        <span className="text-slate-400">Batas bulanan</span>
                         <span className={isOver ? "text-rose-600" : isWarning ? "text-amber-600" : "text-slate-700"}>
                             {formatCurrency(spent)} / {formatCurrency(limit)}
                         </span>
                     </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden shadow-inner">
+                    <div
+                        className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100"
+                        role="progressbar"
+                        aria-label={`Pemakaian anggaran ${name}`}
+                        aria-valuenow={progress}
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                    >
                         <div
                             className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-rose-500' : isWarning ? 'bg-amber-500' : scheme.bar}`}
                             style={{ width: `${progress}%` }}
                         />
                     </div>
                     {(isOver || isWarning) && (
-                        <p className={`text-[10px] font-bold ${isOver ? 'text-rose-600' : 'text-amber-600'}`}>
-                            {isOver ? 'MELEBIHI BATAS ANGGARAN!' : 'MENDEKATI BATAS ANGGARAN'}
+                        <p className={`text-xs font-medium ${isOver ? 'text-rose-600' : 'text-amber-600'}`}>
+                            {isOver ? 'Melebihi batas anggaran' : 'Mendekati batas anggaran'}
                         </p>
                     )}
                 </div>

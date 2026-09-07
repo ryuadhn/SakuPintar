@@ -60,13 +60,13 @@ export default function TransactionRow({ name, subname, category, date, amount, 
     return (
         <tr className="hover:bg-slate-50/50 transition-colors border-t border-stone-200">
             {/* Description & Icon */}
-            <td className="py-4 px-8 w-1/2">
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-[#0e6c4a]/10 rounded-full flex justify-center items-center shrink-0">
+            <td className="py-3 px-6 w-1/2">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-[#0e6c4a]/10 rounded-full flex justify-center items-center shrink-0">
                         {renderIcon()}
                     </div>
                     <div className="flex flex-col justify-start items-start">
-                        <span className="text-zinc-900 text-base font-bold leading-6">
+                        <span className="text-zinc-900 text-sm font-medium leading-5">
                             {name}
                         </span>
                         {subname && (
@@ -79,22 +79,22 @@ export default function TransactionRow({ name, subname, category, date, amount, 
             </td>
             
             {/* Category */}
-            <td className="py-4 px-8">
-                <div className={`px-3 py-1 rounded-full text-xs font-bold w-fit ${getBadgeStyle()}`}>
+            <td className="py-3 px-6">
+                <div className={`ui-badge rounded-full w-fit ${getBadgeStyle()}`}>
                     {category}
                 </div>
             </td>
             
             {/* Date */}
-            <td className="py-4 px-8">
-                <span className="text-slate-600 text-sm font-semibold tracking-wide">
+            <td className="py-3 px-6">
+                <span className="text-slate-600 text-sm font-medium tracking-wide">
                     {date}
                 </span>
             </td>
             
             {/* Amount */}
-            <td className="py-4 px-8 text-right">
-                <span className={`text-base font-bold leading-6 ${type === 'transfer' ? 'text-slate-600' : isExpense ? 'text-red-700' : 'text-[#0e6c4a]'}`}>
+            <td className="py-3 px-6 text-right">
+                <span className={`text-sm font-semibold leading-5 ${type === 'transfer' ? 'text-slate-600' : isExpense ? 'text-red-700' : 'text-[#0e6c4a]'}`}>
                     {isExpense ? `- ${formattedAmount}` : `+ ${formattedAmount}`}
                 </span>
             </td>

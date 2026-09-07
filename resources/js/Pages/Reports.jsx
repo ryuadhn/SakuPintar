@@ -5,7 +5,7 @@ import { fmtIDR, currentMonthKey, formatMonthYear } from '../Utils/format';
 import { TrendingUp, TrendingDown, BrainCircuit, CheckCircle, Info, Calendar } from 'lucide-react';
 
 export default function Reports() {
-    const { transactions, categories, getBudgetAlerts, wallets } = useFinance();
+    const { transactions, categories, budgets, wallets } = useFinance();
 
     // ─── State ───
     const [selectedMonth, setSelectedMonth] = useState(currentMonthKey());
@@ -31,14 +31,27 @@ export default function Reports() {
     const stats = useMemo(() => {
         let income = 0;
         let expense = 0;
+        let transactionCount = 0;
         monthTransactions.forEach((t) => {
-            if (t.type === 'income') income += t.amount;
-            else if (t.type === 'expense') expense += t.amount;
+            const amount = Number(t.amount) || 0;
+            if (t.type === 'income') {
+                income += amount;
+                if (amount > 0) transactionCount += 1;
+            } else if (t.type === 'expense') {
+                expense += amount;
+                if (amount > 0) transactionCount += 1;
+            }
         });
         const net = income - expense;
-        const savingsRate = income > 0 ? Math.max(0, Math.round((net / income) * 100)) : 0;
-        return { income, expense, net, savingsRate };
+        const savingsRate = income > 0 ? Math.round((net / income) * 100) : null;
+        return { income, expense, net, savingsRate, transactionCount };
     }, [monthTransactions]);
+
+    const hasFinancialData = stats.transactionCount > 0;
+    const hasCompleteCashFlowData = stats.income > 0 && stats.expense > 0;
+    const savingsRateLabel = stats.savingsRate === null
+        ? (hasFinancialData ? '—' : '0%')
+        : `${stats.savingsRate}%`;
 
     // ─── Group Expense by Category ───
     const categoryData = useMemo(() => {
@@ -47,7 +60,7 @@ export default function Reports() {
         monthTransactions.forEach((t) => {
             if (t.type !== 'expense') return;
             const catId = t.categoryId || 'other';
-            map[catId] = (map[catId] || 0) + t.amount;
+            map[catId] = (map[catId] || 0) + (Number(t.amount) || 0);
         });
 
         const data = Object.entries(map).map(([catId, amount]) => {
@@ -95,6 +108,16 @@ export default function Reports() {
         return categoryData[0] || null;
     }, [hoveredCatId, categoryData]);
 
+    const selectedBudgetAlerts = useMemo(() => categoryData.flatMap((category) => {
+        const limit = Number(budgets?.[category.id]) || 0;
+        if (limit <= 0) return [];
+
+        const percentage = Math.round((category.amount / limit) * 100);
+        return percentage >= 100
+            ? [{ name: category.name, limit, spent: category.amount, percentage }]
+            : [];
+    }), [categoryData, budgets]);
+
     // ─── Daily Spending Trend ───
     const dailyTrend = useMemo(() => {
         const [year, month] = selectedMonth.split('-').map(Number);
@@ -105,7 +128,7 @@ export default function Reports() {
             if (t.type !== 'expense') return;
             const day = Number(t.date.slice(8, 10));
             if (day >= 1 && day <= daysInMonth) {
-                dailyAmounts[day - 1] += t.amount;
+                dailyAmounts[day - 1] += Number(t.amount) || 0;
             }
         });
 
@@ -121,61 +144,77 @@ export default function Reports() {
     // ─── AI Financial Advisor Recommendations ───
     const aiInsights = useMemo(() => {
         const insights = [];
-        const { income, expense, net, savingsRate } = stats;
+        const { net, savingsRate } = stats;
 
-        // 1. Defisit check
-        if (net < 0) {
+        if (!hasFinancialData) {
+            return [{
+                type: 'neutral',
+                title: 'Belum cukup data untuk analisis',
+                desc: 'Tambahkan beberapa transaksi agar SakuPintar dapat memberikan insight berdasarkan aktivitas keuangan Anda.',
+            }];
+        }
+
+        if (!hasCompleteCashFlowData) {
+            insights.push({
+                type: 'neutral',
+                title: 'Data arus kas belum lengkap',
+                desc: 'Insight arus kas yang lebih utuh membutuhkan transaksi pemasukan dan pengeluaran pada periode ini.',
+            });
+        } else if (net < 0) {
             insights.push({
                 type: 'danger',
-                title: 'Defisit Anggaran Terdeteksi',
-                desc: `Pengeluaran Anda bulan ini melebihi pemasukan sebesar ${fmtIDR(Math.abs(net))}. Disarankan untuk membatasi pengeluaran non-esensial segera.`,
+                title: 'Arus kas bulan ini defisit',
+                desc: `Berdasarkan transaksi bulan ini, pengeluaran melebihi pemasukan sebesar ${fmtIDR(Math.abs(net))}.`,
             });
-        } else if (savingsRate >= 25) {
+        } else if (net > 0 && savingsRate >= 25) {
             insights.push({
                 type: 'success',
-                title: 'Kesehatan Tabungan Sangat Baik',
-                desc: `Luar biasa! Anda menghemat ${savingsRate}% dari pemasukan bulan ini. Pertahankan tingkat tabungan yang sehat ini.`,
+                title: 'Savings rate bulan ini cukup tinggi',
+                desc: `Berdasarkan transaksi bulan ini, arus kas surplus dan sekitar ${savingsRate}% pemasukan tersisa setelah pengeluaran.`,
             });
-        } else if (income > 0 && savingsRate < 10) {
+        } else if (net > 0 && savingsRate < 10) {
             insights.push({
                 type: 'warning',
-                title: 'Rasio Tabungan Rendah',
-                desc: `Rasio menabung Anda hanya ${savingsRate}% bulan ini (di bawah rekomendasi 10%-20%). Cobalah menyisihkan dana tabungan di awal bulan sebelum berbelanja.`,
+                title: 'Savings rate bulan ini masih rendah',
+                desc: `Sekitar ${savingsRate}% pemasukan tersisa setelah pengeluaran tercatat pada periode ini.`,
+            });
+        } else if (net === 0) {
+            insights.push({
+                type: 'neutral',
+                title: 'Arus kas bulan ini seimbang',
+                desc: 'Pemasukan dan pengeluaran yang tercatat memiliki nilai yang sama, sehingga belum ada surplus atau defisit.',
             });
         }
 
-        // 2. Impulsive Category Check
+        // Category concentration is only shown when an expense category has real data.
         categoryData.forEach((c) => {
             if (c.percentage >= 35 && ['lifestyle', 'shopping', 'food'].includes(c.id)) {
                 insights.push({
                     type: 'warning',
-                    title: `Dominasi Pengeluaran Kategori: ${c.name}`,
-                    desc: `Kategori ${c.name} memakan ${c.percentage}% dari total pengeluaran bulanan Anda. Coba evaluasi belanja bulanan Anda pada sektor ini.`,
+                    title: `${c.name} menjadi kategori terbesar`,
+                    desc: `Pengeluaran pada kategori ini mencakup ${c.percentage}% dari total pengeluaran periode ini.`,
                 });
             }
         });
 
-        // 3. General Budget Alerts from Store
-        const budgetAlerts = getBudgetAlerts().filter((a) => a.level === 'over');
-        if (budgetAlerts.length > 0) {
+        if (selectedBudgetAlerts.length > 0) {
             insights.push({
                 type: 'danger',
-                title: 'Melebihi Batas Anggaran Kategori',
-                desc: `Anda telah melampaui batas anggaran pada ${budgetAlerts.length} kategori (${budgetAlerts.map(a => a.name).join(', ')}).`,
+                title: 'Ada kategori yang melewati anggaran',
+                desc: `${selectedBudgetAlerts.length} kategori melewati batas: ${selectedBudgetAlerts.map(a => a.name).join(', ')}.`,
             });
         }
 
-        // Default if everything is fine and no specific alert
         if (insights.length === 0) {
             insights.push({
-                type: 'success',
-                title: 'Keuangan Bulan Ini Terpantau Stabil',
-                desc: 'Arus kas Anda seimbang dan semua batas anggaran kategori masih terjaga dengan aman. Kerja bagus!',
+                type: 'neutral',
+                title: 'Belum ada pola khusus yang perlu ditindaklanjuti',
+                desc: 'Tidak ada kategori dominan atau batas anggaran yang terlampaui dari transaksi tercatat pada periode ini.',
             });
         }
 
         return insights;
-    }, [stats, categoryData, getBudgetAlerts]);
+    }, [stats, categoryData, selectedBudgetAlerts, hasFinancialData, hasCompleteCashFlowData]);
 
     // ─── Export CSV (Excel) ───
     const exportCSV = () => {
@@ -239,16 +278,16 @@ export default function Reports() {
                 <head>
                     <title>Laporan Keuangan SakuPintar - ${formatMonthYear(selectedMonth + '-01')}</title>
                     <style>
-                        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #1e293b; padding: 40px; line-height: 1.5; }
-                        h1 { color: #0E6C4A; margin-bottom: 5px; font-weight: 800; font-size: 28px; }
-                        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0E6C4A; padding-bottom: 20px; margin-bottom: 30px; }
-                        .grid { display: grid; grid-template-cols: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
-                        .card { padding: 15px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; }
-                        .card-title { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px; }
-                        .card-value { font-size: 18px; font-weight: bold; margin-top: 5px; }
-                        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 13px; }
-                        th { background-color: #f1f5f9; padding: 10px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; border-bottom: 2px solid #cbd5e1; color: #475569; }
-                        .section-title { font-size: 15px; font-weight: bold; color: #0E6C4A; margin-top: 30px; margin-bottom: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+                         body { font-family: 'Outfit', 'Inter', sans-serif; color: #18211c; padding: 32px; line-height: 1.5; }
+                         h1 { color: #0E6C4A; margin-bottom: 5px; font-weight: 600; font-size: 24px; }
+                         .header { display: flex; justify-content: space-between; border-bottom: 1px solid #c6d3ca; padding-bottom: 16px; margin-bottom: 24px; }
+                         .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+                         .card { padding: 16px; border: 1px solid #dce6df; border-radius: 10px; background: #f3f7f4; }
+                         .card-title { font-size: 10px; color: #526158; font-weight: 500; }
+                         .card-value { font-size: 18px; font-weight: 600; margin-top: 5px; }
+                         table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 13px; }
+                         th { background-color: #f3f7f4; padding: 10px; text-align: left; font-size: 11px; font-weight: 600; border-bottom: 1px solid #c6d3ca; color: #526158; }
+                         .section-title { font-size: 15px; font-weight: 600; color: #0E6C4A; margin-top: 24px; margin-bottom: 12px; border-bottom: 1px solid #dce6df; padding-bottom: 5px; }
                     </style>
                 </head>
                 <body>
@@ -258,8 +297,8 @@ export default function Reports() {
                             <p style="margin: 0; font-size: 13px; color: #64748b;">Laporan Analisis Keuangan Bulanan</p>
                         </div>
                         <div style="text-align: right; font-size: 13px;">
-                            <p style="margin: 0; font-weight: bold;">Bulan: ${formatMonthYear(selectedMonth + '-01')}</p>
-                            <p style="margin: 0; font-size: 11px; color: #64748b; mt-1;">Dicetak pada: ${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID')}</p>
+                            <p style="margin: 0; font-weight: 600;">Bulan: ${formatMonthYear(selectedMonth + '-01')}</p>
+                            <p style="margin: 4px 0 0; font-size: 11px; color: #526158;">Dicetak pada: ${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID')}</p>
                         </div>
                     </div>
 
@@ -274,11 +313,11 @@ export default function Reports() {
                         </div>
                         <div class="card">
                             <div class="card-title">Arus Kas Bersih</div>
-                            <div class="card-value" style="color: ${stats.net >= 0 ? '#0E6C4A' : '#e11d48'};">${stats.net >= 0 ? '+' : ''}${fmtIDR(stats.net)}</div>
+                            <div class="card-value" style="color: ${stats.net > 0 ? '#0E6C4A' : stats.net < 0 ? '#e11d48' : '#526158'};">${stats.net > 0 ? '+' : ''}${fmtIDR(stats.net)}</div>
                         </div>
                         <div class="card">
                             <div class="card-title">Rasio Tabungan</div>
-                            <div class="card-value">${stats.savingsRate}%</div>
+                            <div class="card-value">${savingsRateLabel}</div>
                         </div>
                     </div>
 
@@ -329,24 +368,24 @@ export default function Reports() {
 
     return (
         <AuthenticatedLayout>
-            <div className="flex flex-col gap-8 pb-12">
+            <div className="app-page">
                 
                 {/* ── Header ── */}
-                <div className="flex justify-between items-center flex-wrap gap-4">
+                <div className="app-page-header">
                     <div>
-                        <h1 className="text-zinc-900 text-3xl font-bold leading-10">Analisis Laporan</h1>
-                        <p className="text-neutral-700 text-sm mt-1">Evaluasi arus kas, alokasi pengeluaran, dan rasio tabungan Anda.</p>
+                        <h1 className="app-page-title">Analisis Laporan</h1>
+                        <p className="app-page-description">Evaluasi arus kas, alokasi pengeluaran, dan rasio tabungan Anda.</p>
                     </div>
 
                     {/* Filters & Actions */}
-                    <div className="flex items-center flex-wrap gap-3">
+                    <div className="flex items-center flex-wrap gap-2">
                         {/* Month Filter */}
-                        <div className="flex items-center gap-2.5 bg-white px-4 py-2.5 rounded-xl border border-stone-200 shadow-sm">
+                        <div className="ui-filter-shell">
                             <Calendar className="w-4 h-4 text-emerald-800" />
                             <select
                                 value={selectedMonth}
                                 onChange={(e) => setSelectedMonth(e.target.value)}
-                                className="bg-transparent text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer border-none p-0 pr-6 focus:ring-0"
+                                className="ui-control bg-transparent text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer border-none p-0 pr-6 focus:ring-0"
                             >
                                 {availableMonths.map((m) => (
                                     <option key={m} value={m}>
@@ -359,7 +398,7 @@ export default function Reports() {
                         {/* Export PDF Button */}
                         <button
                             onClick={exportPDF}
-                            className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                            className="ui-button bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -370,7 +409,7 @@ export default function Reports() {
                         {/* Export Excel (CSV) Button */}
                         <button
                             onClick={exportCSV}
-                            className="px-4 py-2.5 bg-white hover:bg-slate-50 border border-stone-200 text-slate-700 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                            className="ui-button border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -381,67 +420,67 @@ export default function Reports() {
                 </div>
 
                 {/* ── Cash Flow Bento Cards ── */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Income */}
-                    <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm flex items-center gap-4">
-                        <div className="w-11 h-11 bg-emerald-50 text-emerald-800 rounded-xl flex items-center justify-center shrink-0">
-                            <TrendingUp className="w-5 h-5" />
+                    <div className="ui-stat-card flex items-center gap-3">
+                        <div className="w-10 h-10 bg-emerald-50 text-emerald-800 rounded-lg flex items-center justify-center shrink-0">
+                            <TrendingUp className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
-                            <span className="block text-slate-500 text-xs font-semibold">Total Pemasukan</span>
-                            <span className="block text-slate-800 font-bold text-lg mt-0.5 truncate">{fmtIDR(stats.income)}</span>
+                            <span className="block text-slate-500 text-xs font-medium">Total Pemasukan</span>
+                            <span className="block text-slate-800 font-semibold text-base mt-0.5 truncate">{fmtIDR(stats.income)}</span>
                         </div>
                     </div>
 
                     {/* Expenses */}
-                    <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm flex items-center gap-4">
-                        <div className="w-11 h-11 bg-rose-50 text-rose-800 rounded-xl flex items-center justify-center shrink-0">
-                            <TrendingDown className="w-5 h-5" />
+                    <div className="ui-stat-card flex items-center gap-3">
+                        <div className="w-10 h-10 bg-rose-50 text-rose-800 rounded-lg flex items-center justify-center shrink-0">
+                            <TrendingDown className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
-                            <span className="block text-slate-500 text-xs font-semibold">Total Pengeluaran</span>
-                            <span className="block text-slate-800 font-bold text-lg mt-0.5 truncate">{fmtIDR(stats.expense)}</span>
+                            <span className="block text-slate-500 text-xs font-medium">Total Pengeluaran</span>
+                            <span className="block text-slate-800 font-semibold text-base mt-0.5 truncate">{fmtIDR(stats.expense)}</span>
                         </div>
                     </div>
 
                     {/* Net Balance */}
-                    <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm flex items-center gap-4">
-                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${stats.net >= 0 ? 'bg-indigo-50 text-indigo-800' : 'bg-amber-50 text-amber-800'}`}>
-                            <Info className="w-5 h-5" />
+                    <div className="ui-stat-card flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${stats.net > 0 ? 'bg-indigo-50 text-indigo-800' : stats.net < 0 ? 'bg-amber-50 text-amber-800' : 'bg-slate-50 text-slate-600'}`}>
+                            <Info className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
-                            <span className="block text-slate-500 text-xs font-semibold">Sisa Arus Kas</span>
-                            <span className={`block font-bold text-lg mt-0.5 truncate ${stats.net >= 0 ? 'text-indigo-800' : 'text-amber-800'}`}>
-                                {stats.net >= 0 ? '+' : ''}{fmtIDR(stats.net)}
+                            <span className="block text-slate-500 text-xs font-medium">Sisa Arus Kas</span>
+                            <span className={`block font-semibold text-base mt-0.5 truncate ${stats.net > 0 ? 'text-indigo-800' : stats.net < 0 ? 'text-amber-800' : 'text-slate-700'}`}>
+                                {stats.net > 0 ? '+' : ''}{fmtIDR(stats.net)}
                             </span>
                         </div>
                     </div>
 
                     {/* Saving Rate */}
-                    <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm flex items-center gap-4">
-                        <div className="w-11 h-11 bg-teal-50 text-teal-800 rounded-xl flex items-center justify-center shrink-0">
-                            <CheckCircle className="w-5 h-5" />
+                    <div className="ui-stat-card flex items-center gap-3">
+                        <div className="w-10 h-10 bg-teal-50 text-teal-800 rounded-lg flex items-center justify-center shrink-0">
+                            <CheckCircle className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
-                            <span className="block text-slate-500 text-xs font-semibold">Tingkat Menabung</span>
-                            <span className="block text-slate-800 font-bold text-lg mt-0.5">{stats.savingsRate}%</span>
+                            <span className="block text-slate-500 text-xs font-medium">Tingkat Menabung</span>
+                            <span className="block text-slate-800 font-semibold text-base mt-0.5">{savingsRateLabel}</span>
                         </div>
                     </div>
                 </div>
 
                 {/* ── Donut Chart and Category Breakdown ── */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                     
                     {/* SVG Donut Chart (Left: 5/12) */}
-                    <div className="lg:col-span-5 bg-white p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col items-center justify-center min-h-[350px]">
-                        <h3 className="text-slate-800 font-bold text-base mb-6 self-start">Alokasi Pengeluaran</h3>
+                    <div className="ui-card lg:col-span-5 flex flex-col items-center justify-center min-h-[300px]">
+                        <h3 className="ui-section-title mb-4 self-start">Alokasi Pengeluaran</h3>
                         
                         {stats.expense === 0 ? (
-                            <div className="text-center py-10 text-slate-400 text-sm">
-                                Tidak ada pengeluaran tercatat di periode ini.
+                            <div className="text-center py-8 text-slate-400 text-sm">
+                                Belum ada pengeluaran tercatat pada periode ini.
                             </div>
                         ) : (
-                            <div className="relative w-60 h-60 flex items-center justify-center">
+                            <div className="relative w-52 h-52 flex items-center justify-center">
                                 {/* SVG Arc */}
                                 <svg width="220" height="220" viewBox="0 0 120 120" className="transform -rotate-90">
                                     {donutSegments.map((seg) => {
@@ -470,13 +509,13 @@ export default function Reports() {
                                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-6">
                                     {displayedCategory ? (
                                         <>
-                                            <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 max-w-[130px] truncate">
+                                            <span className="text-[10px] font-medium text-slate-400 max-w-[130px] truncate">
                                                 {displayedCategory.name}
                                             </span>
-                                            <span className="text-slate-800 font-extrabold text-lg mt-0.5">
+                                    <span className="text-slate-800 font-semibold text-base mt-0.5">
                                                 {fmtIDR(displayedCategory.amount)}
                                             </span>
-                                            <span className="text-emerald-700 font-bold text-xs mt-0.5">
+                                    <span className="text-emerald-700 font-medium text-xs mt-0.5">
                                                 {displayedCategory.percentage}% dari total
                                             </span>
                                         </>
@@ -494,13 +533,13 @@ export default function Reports() {
                     </div>
 
                     {/* Category List (Right: 7/12) */}
-                    <div className="lg:col-span-7 bg-white p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col justify-between">
+                    <div className="ui-card lg:col-span-7 flex flex-col justify-between">
                         <div className="space-y-4">
-                            <h3 className="text-slate-800 font-bold text-base mb-2">Detail Pengeluaran per Kategori</h3>
+                            <h3 className="ui-section-title mb-2">Detail Pengeluaran per Kategori</h3>
                             
                             <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1">
                                 {categoryData.length === 0 ? (
-                                    <p className="text-slate-400 text-sm text-center py-10">Belum ada pengeluaran.</p>
+                                    <p className="ui-empty py-6">Belum ada pengeluaran tercatat pada periode ini.</p>
                                 ) : (
                                     categoryData.map((c) => (
                                         <div
@@ -514,11 +553,11 @@ export default function Reports() {
                                             }`}
                                         >
                                             <div className="flex justify-between items-center text-xs">
-                                                <div className="flex items-center gap-2 font-bold text-slate-700">
+                                                <div className="flex items-center gap-2 font-medium text-slate-700">
                                                     <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
                                                     {c.name}
                                                 </div>
-                                                <div className="font-bold text-slate-800">
+                                                <div className="font-medium text-slate-800">
                                                     {fmtIDR(c.amount)}
                                                     <span className="text-[10px] text-slate-400 font-normal ml-1.5">
                                                         ({c.percentage}%)
@@ -542,15 +581,15 @@ export default function Reports() {
                 </div>
 
                 {/* ── Daily Spending Trend (Bar Chart) ── */}
-                <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col gap-4">
+                <div className="ui-card flex flex-col gap-3">
                     <div>
-                        <h3 className="text-slate-800 font-bold text-base">Tren Pengeluaran Harian</h3>
-                        <p className="text-slate-500 text-xs mt-0.5">Analisis intensitas pengeluaran harian Anda di bulan ini.</p>
+                        <h3 className="ui-section-title">Tren Pengeluaran Harian</h3>
+                        <p className="ui-section-description">Analisis intensitas pengeluaran harian Anda di bulan ini.</p>
                     </div>
 
                     {stats.expense === 0 ? (
-                        <div className="text-center py-12 text-slate-400 text-sm">
-                            Tidak ada pengeluaran untuk divisualisasikan.
+                        <div className="text-center py-8 text-slate-400 text-sm">
+                            Belum ada pengeluaran untuk divisualisasikan pada periode ini.
                         </div>
                     ) : (
                         <div className="w-full pt-4">
@@ -559,7 +598,7 @@ export default function Reports() {
                                 {dailyTrend.map((bar) => (
                                     <div key={bar.day} className="flex-1 min-w-[12px] flex flex-col items-center gap-2 group h-full justify-end">
                                         {/* Value Tooltip */}
-                                        <div className="absolute mb-24 hidden group-hover:block bg-slate-800 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10 pointer-events-none">
+                                        <div className="ui-tooltip absolute mb-24 hidden group-hover:block bg-slate-800 text-white text-[9px] font-bold px-1.5 py-0.5 rounded z-10 pointer-events-none">
                                             {fmtIDR(bar.amount)}
                                         </div>
                                         
@@ -585,39 +624,35 @@ export default function Reports() {
                 </div>
 
                 {/* ── AI Insight Card ── */}
-                <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-950 text-white rounded-3xl p-6 shadow-md relative overflow-hidden border border-emerald-900/30">
-                    <div className="absolute right-0 top-0 w-64 h-full bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-                    
-                    <div className="flex flex-col gap-4 relative z-10">
-                        <div className="flex items-center gap-2.5">
-                            <div className="bg-emerald-900/40 p-2 rounded-xl border border-emerald-500/20 text-emerald-400">
-                                <BrainCircuit className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-sm leading-4">Analisis AI & Rekomendasi Cerdas</h3>
-                                <p className="text-[10px] text-slate-400 mt-0.5">Rekomendasi keuangan dinamis SakuPintar</p>
-                            </div>
+                <div className="ui-card p-4 flex flex-col gap-3">
+                    <div className="flex items-start gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-800 shrink-0">
+                            <BrainCircuit className="w-4 h-4" />
                         </div>
+                        <div>
+                            <h3 className="ui-section-title">Insight Laporan</h3>
+                            <p className="text-xs text-slate-500 mt-0.5">Ringkasan berdasarkan transaksi pada periode terpilih.</p>
+                        </div>
+                    </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-1">
-                            {aiInsights.map((insight, idx) => (
-                                <div 
-                                    key={idx} 
-                                    className={`p-4 rounded-2xl border text-xs flex flex-col gap-1 backdrop-blur-md ${
-                                        insight.type === 'danger'
-                                            ? 'border-red-900/40 bg-red-950/20 text-red-100'
-                                            : insight.type === 'warning'
-                                            ? 'border-amber-900/40 bg-amber-950/20 text-amber-100'
-                                            : 'border-emerald-900/40 bg-emerald-950/20 text-emerald-100'
-                                    }`}
-                                >
-                                    <span className="font-bold text-sm block">
-                                        {insight.title}
-                                    </span>
-                                    <p className="text-slate-300 leading- relaxed mt-0.5">{insight.desc}</p>
-                                </div>
-                            ))}
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {aiInsights.map((insight, idx) => (
+                            <div
+                                key={idx}
+                                className={`rounded-xl border p-3 text-xs flex flex-col gap-1 ${
+                                    insight.type === 'danger'
+                                        ? 'border-rose-200 bg-rose-50 text-rose-950'
+                                        : insight.type === 'warning'
+                                        ? 'border-amber-200 bg-amber-50 text-amber-950'
+                                        : insight.type === 'success'
+                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-950'
+                                        : 'border-slate-200 bg-slate-50 text-slate-800'
+                                }`}
+                            >
+                                <span className="font-semibold text-sm">{insight.title}</span>
+                                <p className="leading-relaxed text-slate-600">{insight.desc}</p>
+                            </div>
+                        ))}
                     </div>
                 </div>
 

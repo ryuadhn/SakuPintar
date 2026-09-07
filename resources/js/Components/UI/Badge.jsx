@@ -1,7 +1,7 @@
 import React from 'react';
 
 export default function Badge({ children, type = 'default', className = '' }) {
-    const baseStyle = "inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium tracking-wide transition-colors duration-150";
+    const baseStyle = "ui-badge transition-colors duration-150";
     
     const types = {
         default: "bg-slate-100 text-slate-700 border border-slate-200",

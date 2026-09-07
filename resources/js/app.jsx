@@ -16,12 +16,13 @@ import Reports from './Pages/Reports';
 import AIAdvisor from './Pages/AIAdvisor';
 import FinancialPlanner from './Pages/FinancialPlanner';
 import BillsCalendar from './Pages/BillsCalendar';
+import Tasks from './Pages/Tasks';
 
 function ProtectedRoute({ children }) {
   const { user, authLoading } = useAuth();
   if (authLoading) {
     return (
-      <div className="h-screen w-screen flex justify-center items-center bg-[#F7FAF5]">
+      <div className="app-shell h-screen w-screen flex justify-center items-center">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#0e6c4a] border-t-transparent"></div>
       </div>
     );
@@ -34,7 +35,7 @@ function GuestRoute({ children }) {
   const { user, authLoading } = useAuth();
   if (authLoading) {
     return (
-      <div className="h-screen w-screen flex justify-center items-center bg-[#F7FAF5]">
+      <div className="app-shell h-screen w-screen flex justify-center items-center">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#0e6c4a] border-t-transparent"></div>
       </div>
     );
@@ -47,7 +48,7 @@ function RootRoute() {
   const { user, authLoading } = useAuth();
   if (authLoading) {
     return (
-      <div className="h-screen w-screen flex justify-center items-center bg-[#F7FAF5]">
+      <div className="app-shell h-screen w-screen flex justify-center items-center">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#0e6c4a] border-t-transparent"></div>
       </div>
     );
@@ -77,7 +78,8 @@ function App() {
             <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
             <Route path="/ai-advisor" element={<ProtectedRoute><AIAdvisor /></ProtectedRoute>} />
             <Route path="/planner" element={<ProtectedRoute><FinancialPlanner /></ProtectedRoute>} />
-            <Route path="/calendar" element={<ProtectedRoute><BillsCalendar /></ProtectedRoute>} />
+             <Route path="/calendar" element={<ProtectedRoute><BillsCalendar /></ProtectedRoute>} />
+             <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
 
             {/* Fallback route */}
             <Route path="*" element={<RootRoute />} />

@@ -34,7 +34,7 @@ const loadSession = () => {
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
-    const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
+    const [authLoading, setAuthLoading] = useState(true);
 
     // Sync Auth Session
     useEffect(() => {

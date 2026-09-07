@@ -15,7 +15,7 @@ export default function BudgetAlertBanner() {
         : `${warning.length} kategori mendekati batas anggaran`;
 
     return (
-        <div className={`rounded-2xl p-4 sm:p-5 border flex flex-col gap-3 ${over.length > 0
+        <div className={`ui-notice p-3 sm:p-4 border flex flex-col gap-2.5 ${over.length > 0
             ? 'bg-red-50 border-red-200'
             : 'bg-amber-50 border-amber-200'}`}
         >
@@ -23,15 +23,15 @@ export default function BudgetAlertBanner() {
                 <svg className={`w-5 h-5 shrink-0 ${over.length > 0 ? 'text-red-600' : 'text-amber-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <span className={`font-bold text-sm ${over.length > 0 ? 'text-red-700' : 'text-amber-700'}`}>{headline}</span>
+                <span className={`font-semibold text-sm ${over.length > 0 ? 'text-red-700' : 'text-amber-700'}`}>{headline}</span>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
                 {alerts.slice(0, 4).map((a) => (
-                    <div key={a.categoryId} className="flex-1 bg-white/70 rounded-xl px-4 py-3 border border-white min-w-[180px]">
-                        <div className="flex justify-between items-center mb-1.5">
-                            <span className="text-xs font-bold text-slate-700">{a.name}</span>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${a.level === 'over'
+                    <div key={a.categoryId} className="flex-1 bg-white/70 rounded-lg px-3 py-2 border border-white min-w-[180px]">
+                        <div className="flex justify-between items-center mb-1">
+                            <span className="text-xs font-medium text-slate-700">{a.name}</span>
+                            <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${a.level === 'over'
                                 ? 'bg-red-100 text-red-700'
                                 : 'bg-amber-100 text-amber-700'}`}
                             >
@@ -44,14 +44,14 @@ export default function BudgetAlertBanner() {
                                 style={{ width: `${Math.min(100, a.pct)}%` }}
                             />
                         </div>
-                        <p className="text-[11px] text-slate-500 font-medium">
+                        <p className="text-xs text-slate-500 font-normal">
                             {fmtIDR(a.spent)} / {fmtIDR(a.limit)}
                         </p>
                     </div>
                 ))}
             </div>
 
-            <Link to="/categories" className={`text-xs font-bold hover:underline w-fit ${over.length > 0 ? 'text-red-700' : 'text-amber-700'}`}>
+            <Link to="/categories" className={`text-xs font-medium hover:underline w-fit ${over.length > 0 ? 'text-red-700' : 'text-amber-700'}`}>
                 Kelola anggaran &rarr;
             </Link>
         </div>

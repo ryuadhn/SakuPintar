@@ -68,7 +68,7 @@ export default function RecurringModal({ isOpen, onClose }) {
         if (saved) onClose();
     };
 
-    const selectClass = "block min-h-[44px] w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm text-slate-900 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-emerald-500";
+    const selectClass = "ui-control block min-h-[44px] w-full bg-white px-3 py-2.5 text-sm text-slate-900";
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Aturan Transaksi Rutin">
@@ -109,14 +109,14 @@ export default function RecurringModal({ isOpen, onClose }) {
 
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label htmlFor="recurring-type" className="block text-sm font-semibold text-slate-700 mb-1.5">Tipe</label>
+                        <label htmlFor="recurring-type" className="ui-field-label block mb-1.5">Tipe</label>
                         <select id="recurring-type" className={selectClass} value={type} onChange={(e) => { setType(e.target.value); setCategoryId(''); }} disabled={formBusy}>
                             <option value="expense">Pengeluaran</option>
                             <option value="income">Pemasukan</option>
                         </select>
                     </div>
                     <div>
-                        <label htmlFor="recurring-category" className="block text-sm font-semibold text-slate-700 mb-1.5">Kategori</label>
+                        <label htmlFor="recurring-category" className="ui-field-label block mb-1.5">Kategori</label>
                         <select
                             id="recurring-category"
                             className={selectClass}
@@ -138,7 +138,7 @@ export default function RecurringModal({ isOpen, onClose }) {
 
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label htmlFor="recurring-wallet" className="block text-sm font-semibold text-slate-700 mb-1.5">Dompet</label>
+                        <label htmlFor="recurring-wallet" className="ui-field-label block mb-1.5">Dompet</label>
                         <select id="recurring-wallet" className={selectClass} value={walletId} onChange={(e) => setWalletId(e.target.value)} disabled={formBusy}>
                             {wallets.map((w) => (
                                 <option key={w.id} value={w.id}>{w.name}</option>
@@ -146,7 +146,7 @@ export default function RecurringModal({ isOpen, onClose }) {
                         </select>
                     </div>
                     <div>
-                        <label htmlFor="recurring-frequency" className="block text-sm font-semibold text-slate-700 mb-1.5">Frekuensi</label>
+                        <label htmlFor="recurring-frequency" className="ui-field-label block mb-1.5">Frekuensi</label>
                         <select id="recurring-frequency" className={selectClass} value={frequency} onChange={(e) => setFrequency(e.target.value)} disabled={formBusy}>
                             {Object.entries(FREQ_LABELS).map(([val, label]) => (
                                 <option key={val} value={val}>{label}</option>

@@ -131,7 +131,7 @@ export default function GoalModal({ isOpen, onClose }) {
                 </div>
 
                 <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">Pilih Ikon</label>
+                    <label className="ui-field-label block mb-2">Pilih Ikon</label>
                     <div className="grid grid-cols-6 gap-2">
                         {Object.entries(GOAL_ICONS).map(([key, { label, Icon }]) => {
                             const selected = iconKey === key;
@@ -159,7 +159,7 @@ export default function GoalModal({ isOpen, onClose }) {
                 </div>
 
                 {previewProgress !== null && (
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3">
+                    <div className="ui-card-subtle px-4 py-3">
                         <div className="flex justify-between items-center mb-1.5">
                             <span className="text-xs font-semibold text-slate-600">Pratinjau Progres Awal</span>
                             <span className="text-xs font-bold text-emerald-800">{previewProgress}%</span>

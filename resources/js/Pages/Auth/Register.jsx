@@ -4,13 +4,13 @@ import icon from "../../icon.svg";
 import { useAuth } from "../../Store/AuthContext";
 
 const baseFieldLabelClass =
-  "relative flex items-center self-stretch mt-[-1.00px] font-semibold text-[#3f4943] text-sm tracking-[0.70px] leading-[16.8px]";
+  "ui-auth-field-label";
 
 const baseInputWrapperClass =
-  "flex flex-col items-start relative self-stretch w-full flex-[0_0_auto] bg-[#f7faf5] rounded-xl border border-solid border-[#bec9c0] transition-shadow duration-150 focus-within:shadow-[0_0_0_2px_rgba(14,108,74,0.12)] focus-within:border-[#0e6c4a]";
+  "ui-auth-input-wrap";
 
 const baseInputClass =
-  "relative grow border-[none] bg-transparent self-stretch mt-[-1.00px] font-normal text-[#181d1a] placeholder:text-[#6f7a72] text-base tracking-[0] leading-[normal] p-0 outline-none";
+  "ui-auth-input";
 
 function TextField({
   id,
@@ -22,14 +22,14 @@ function TextField({
   autoComplete,
 }) {
   return (
-    <div className="flex flex-col items-start gap-2 relative self-stretch w-full flex-[0_0_auto]">
-      <div className="flex flex-col items-start pt-0 pb-[0.8px] px-0 relative self-stretch w-full flex-[0_0_auto]">
+    <div className="ui-auth-field">
+        <div>
         <label className={baseFieldLabelClass} htmlFor={id}>
           {label}
         </label>
       </div>
-      <div className={baseInputWrapperClass}>
-        <div className="flex h-12 items-start justify-center pl-12 pr-4 py-3.5 relative self-stretch w-full rounded-xl overflow-hidden">
+      <div className={`${baseInputWrapperClass} pl-12 pr-4`}>
+        <div className="flex h-12 items-start justify-center w-full">
           <input
             id={id}
             type={type}
@@ -42,7 +42,7 @@ function TextField({
           />
         </div>
         {/* Left Icon - User or Envelope */}
-        <div className="inline-flex flex-col h-[48.00%] items-start absolute top-[26.00%] left-[17px] text-neutral-500" aria-hidden="true">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" aria-hidden="true">
           {label === "Email" ? (
             <svg className="relative w-5 h-4 stroke-[1.8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -69,14 +69,14 @@ function PasswordField({
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <div className="flex flex-col items-start gap-[7.99px] relative self-stretch w-full flex-[0_0_auto]">
-      <div className="flex flex-col items-start pt-0 pb-[0.8px] px-0 relative self-stretch w-full flex-[0_0_auto]">
+    <div className="ui-auth-field">
+      <div>
         <label className={baseFieldLabelClass} htmlFor={id}>
           {label}
         </label>
       </div>
-      <div className={baseInputWrapperClass}>
-        <div className="flex h-12 items-start justify-center px-12 py-3.5 relative self-stretch w-full rounded-xl overflow-hidden">
+      <div className={`${baseInputWrapperClass} pl-12 pr-14`}>
+        <div className="flex h-12 items-start justify-center w-full">
           <input
             id={id}
             type={showPassword ? "text" : "password"}
@@ -89,7 +89,7 @@ function PasswordField({
           />
         </div>
         {/* Left Lock Icon */}
-        <div className="inline-flex flex-col h-[48.00%] items-start absolute top-[26.00%] left-[17px] text-neutral-500" aria-hidden="true">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" aria-hidden="true">
           <svg className="relative w-4 h-5 stroke-[1.8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
           </svg>
@@ -104,7 +104,7 @@ function PasswordField({
           }
           aria-pressed={showPassword}
           onClick={() => setShowPassword((prev) => !prev)}
-          className="inline-flex flex-col items-center justify-center pt-0 pb-1.5 px-0 absolute h-[42.00%] top-[29.00%] right-[17px] cursor-pointer text-neutral-500 hover:text-neutral-700 transition-colors"
+          className="ui-auth-password-toggle"
         >
           <div className="inline-flex items-start justify-center relative flex-[0_0_auto]">
             {showPassword ? (
@@ -182,22 +182,17 @@ export default function Register() {
   };
 
   return (
-    <main className="flex items-center justify-center pt-[41.41px] pb-[41.42px] px-6 relative bg-[linear-gradient(0deg,rgba(247,250,245,1)_0%,rgba(247,250,245,1)_100%),linear-gradient(0deg,rgba(255,255,255,1)_0%,rgba(255,255,255,1)_100%)] w-full min-h-screen overflow-hidden">
-      {/* Background Blobs */}
-      <div className="absolute w-full h-full top-0 left-0 overflow-hidden opacity-30 pointer-events-none" aria-hidden="true">
-        <div className="absolute top-[-102px] -left-32 w-[512px] h-[410px] bg-[#74c69d33] rounded-full blur-[60px] animate-blob-1" />
-        <div className="absolute -right-32 bottom-[-102px] w-[640px] h-[512px] bg-[#c8ebd54c] rounded-full blur-[75px] animate-blob-2" />
-      </div>
+    <main className="ui-auth-shell ui-auth-compact">
 
       {/* Card Section */}
-      <section className="flex flex-col max-w-[480px] w-full items-start gap-[39px] p-12 relative bg-white rounded-3xl border border-solid border-[#bec9c0] z-10 shadow-[0px_8px_10px_-6px_#181d1a0d,0px_20px_25px_-5px_#181d1a0d]">
+      <section className="ui-auth-card">
         
         {/* Header Block */}
         <div className="flex flex-col items-center relative self-stretch w-full flex-[0_0_auto]">
           <div className="inline-flex items-center relative flex-[0_0_auto]">
             {/* Brand Logo */}
             <div className="flex flex-col w-9 h-[31px] items-start pt-0 pb-4 px-0 relative">
-              <div className="flex w-9 h-[35px] items-center justify-center relative mb-[-20.00px] bg-[#0e6c4a] rounded-xl shadow-sm">
+                <div className="flex w-9 h-[35px] items-center justify-center relative mb-[-20.00px] bg-[#0e6c4a] rounded-lg">
                 <div className="inline-flex flex-col items-center relative flex-[0_0_auto]">
                   <img
                     className="relative w-[18px] h-[17px]"
@@ -212,7 +207,7 @@ export default function Register() {
             {/* Brand Title */}
             <div className="pl-2 pr-0 py-0 inline-flex flex-col items-start relative flex-[0_0_auto]">
               <div className="inline-flex flex-col items-center relative flex-[0_0_auto]">
-                <div className="relative flex items-center justify-center w-[126px] h-6 mt-[-1.00px] font-extrabold text-[#0e6c4a] text-2xl text-center tracking-[-0.60px] leading-[31.2px] whitespace-nowrap">
+                <div className="relative flex items-center justify-center w-[126px] h-6 mt-[-1.00px] font-semibold text-[#0e6c4a] text-2xl text-center tracking-[-0.60px] leading-[31.2px] whitespace-nowrap">
                   SakuPintar
                 </div>
               </div>
@@ -228,7 +223,7 @@ export default function Register() {
                 </h1>
               </div>
               <div className="flex flex-col max-w-xs items-center relative w-full flex-[0_0_auto]">
-                <p className="relative w-fit mt-[-1.00px] font-normal text-[#3f4943] text-base text-center tracking-[0] leading-6">
+                <p className="relative w-fit font-normal text-[#3f4943] text-sm text-center tracking-[0] leading-5">
                   Mulai perjalanan finansial cerdas Anda
                   <br />
                   sekarang.
@@ -239,13 +234,13 @@ export default function Register() {
         </div>
 
         {error && (
-          <div className="w-full p-3 bg-red-50 text-red-600 rounded-xl text-xs font-semibold border border-red-100 animate-in fade-in duration-300">
+          <div className="ui-auth-error animate-in fade-in duration-300">
             {error}
           </div>
         )}
 
         {/* Register Form */}
-        <form className="flex flex-col items-start gap-[23px] relative self-stretch w-full flex-[0_0_auto]" onSubmit={handleSubmit}>
+        <form className="flex flex-col items-start gap-6 relative self-stretch w-full flex-[0_0_auto]" onSubmit={handleSubmit}>
           
           {/* Full Name field */}
           <TextField
@@ -292,7 +287,7 @@ export default function Register() {
           <button
             type="submit"
             disabled={loading}
-            className="flex h-[57px] items-center justify-center pt-[19.6px] pb-[20.4px] px-0 relative self-stretch bg-[#0e6c4a] hover:bg-[#0a4d35] w-full rounded-xl cursor-pointer transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0e6c4a] text-white font-semibold text-sm tracking-[0.70px] active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none"
+            className="ui-auth-submit"
           >
             {loading ? "Mendaftarkan..." : "Daftar Sekarang"}
           </button>
@@ -304,8 +299,8 @@ export default function Register() {
             </div>
             <div className="flex items-start justify-center relative self-stretch w-full flex-[0_0_auto]">
               <div className="relative self-stretch w-[188.58px] bg-white">
-                <div className="absolute -top-px left-4 h-[17px] flex items-center font-normal text-[#6f7a72] text-xs tracking-[1.20px] leading-[16.8px] whitespace-nowrap bg-white px-2">
-                  ATAU DAFTAR DENGAN
+                  <div className="absolute -top-px left-4 h-[17px] flex items-center font-normal text-[#6f7a72] text-xs leading-[16.8px] whitespace-nowrap bg-white px-2">
+                   Atau daftar dengan
                 </div>
               </div>
             </div>
@@ -318,7 +313,7 @@ export default function Register() {
               type="button"
               onClick={handleGoogleLogin}
               title="Daftar dengan akun Google"
-              className="flex-1 py-0 inline-flex h-12 items-center justify-center gap-3 relative bg-[#f7faf5] hover:bg-[#f1f5ee] rounded-xl border border-solid border-[#bec9c0] cursor-pointer transition-colors duration-150 active:scale-[0.98]"
+              className="ui-auth-social"
               aria-label="Continue with Google"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -327,7 +322,7 @@ export default function Register() {
                 <path fill="#FBBC05" d="M5.25 10.55a6.99 6.99 0 010 2.9l-3.85 2.99a11.96 11.96 0 010-8.88l3.85 2.99z" />
                 <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.73-2.9c-1.1.74-2.5 1.18-4.23 1.18-3.33 0-5.85-1.81-6.75-4.51L1.4 16.85C3.37 20.76 7.35 23 12 23z" />
               </svg>
-              <span className="relative flex items-center justify-center w-fit mt-[-1.00px] font-normal text-[#181d1a] text-base text-center tracking-[0] leading-6 whitespace-nowrap">
+              <span className="relative flex items-center justify-center w-fit font-medium text-[#181d1a] text-sm text-center tracking-[0] leading-5 whitespace-nowrap">
                 Google
               </span>
             </button>
@@ -337,13 +332,13 @@ export default function Register() {
               type="button"
               onClick={handleDemoLogin}
               title="Masuk cepat dengan akun demo"
-              className="flex-1 py-0 inline-flex h-12 items-center justify-center gap-3 relative bg-[#f7faf5] hover:bg-[#f1f5ee] rounded-xl border border-solid border-[#bec9c0] cursor-pointer transition-colors duration-150 active:scale-[0.98]"
+              className="ui-auth-social"
               aria-label="Continue with Apple"
             >
               <svg className="w-5 h-5 fill-zinc-900" viewBox="0 0 24 24">
                 <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-1 .04-2.21.67-2.93 1.49-.62.69-1.16 1.84-1.01 2.96 1.12.09 2.27-.57 2.95-1.39z" />
               </svg>
-              <span className="relative flex items-center justify-center w-fit mt-[-1.00px] font-normal text-[#181d1a] text-base text-center tracking-[0] leading-6 whitespace-nowrap">
+              <span className="relative flex items-center justify-center w-fit font-medium text-[#181d1a] text-sm text-center tracking-[0] leading-5 whitespace-nowrap">
                 Apple
               </span>
             </button>
@@ -352,12 +347,12 @@ export default function Register() {
 
         {/* Footer block */}
         <div className="flex items-start justify-center gap-1.5 pt-[1.01px] pb-0 px-0 relative self-stretch w-full flex-[0_0_auto]">
-          <p className="relative flex items-center justify-center w-fit mt-[-1.00px] font-normal text-[#3f4943] text-base text-center tracking-[0] leading-6 whitespace-nowrap">
+          <p className="relative flex items-center justify-center w-fit font-normal text-[#3f4943] text-sm text-center tracking-[0] leading-5 whitespace-nowrap">
             Sudah memiliki akun?
           </p>
           <Link
             to="/login"
-            className="relative flex items-center justify-center w-fit mt-[-1.00px] font-bold text-[#0e6c4a] text-base text-center tracking-[0] leading-6 whitespace-nowrap hover:underline"
+            className="relative flex items-center justify-center w-fit font-medium text-[#0e6c4a] text-sm text-center tracking-[0] leading-5 whitespace-nowrap hover:underline"
           >
             Masuk
           </Link>

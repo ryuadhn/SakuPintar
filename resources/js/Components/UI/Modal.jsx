@@ -93,10 +93,10 @@ export default function Modal({ isOpen, onClose, title, children, wide = false }
                 aria-modal="true"
                 aria-labelledby={titleId}
                 tabIndex="-1"
-                className={`ui-modal bg-white rounded-xl shadow-xl overflow-hidden w-full relative z-10 max-h-[90vh] overflow-y-auto transform transition-all duration-200 animate-in fade-in zoom-in-95 ${wide ? 'max-w-lg' : 'max-w-md'}`}
+                className={`ui-modal bg-white overflow-hidden w-full relative z-10 max-h-[90vh] overflow-y-auto transform transition-all duration-200 animate-in fade-in zoom-in-95 ${wide ? 'max-w-lg' : 'max-w-md'}`}
             >
-                <div className="px-5 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                    <h2 id={titleId} className="font-medium text-slate-800 text-base">{title}</h2>
+                <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
+                    <h2 id={titleId} className="font-semibold text-slate-800 text-base">{title}</h2>
                     <button
                         ref={closeButtonRef}
                         type="button"

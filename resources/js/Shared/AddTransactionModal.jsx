@@ -173,13 +173,13 @@ export default function AddTransactionModal({ isOpen, onClose, editing = null, i
         onClose();
     };
 
-    const selectClass = "block w-full rounded-xl border border-slate-200 p-2.5 text-sm bg-white text-slate-900 focus:border-emerald-500 focus:ring-emerald-500 focus:outline-none";
+    const selectClass = "ui-control block w-full px-3 py-2 text-sm bg-white text-slate-900";
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={editing ? 'Edit Transaksi' : 'Tambah Transaksi Baru'} wide>
             <form className="space-y-4" onSubmit={handleSubmit} noValidate>
                 {!editing && (
-                    <div className="p-4 bg-emerald-50 rounded-2xl border border-dashed border-emerald-300 text-center relative overflow-hidden flex flex-col items-center justify-center min-h-[140px]">
+                    <div className="p-4 bg-emerald-50 rounded-xl border border-dashed border-emerald-300 text-center relative overflow-hidden flex flex-col items-center justify-center min-h-[120px]">
                         <style>{`
                             @keyframes laserScan {
                                 0% { top: 0%; }
@@ -209,7 +209,7 @@ export default function AddTransactionModal({ isOpen, onClose, editing = null, i
                                     <div className="absolute left-0 right-0 h-0.5 bg-emerald-500 shadow-[0_0_8px_#10b981] laser-line" />
                                 </div>
                                 <div className="flex flex-col items-center">
-                                    <span className="text-xs font-bold text-emerald-800 animate-pulse">Memindai detail struk belanja...</span>
+                                     <span className="text-xs font-medium text-emerald-800 animate-pulse">Memindai detail struk belanja...</span>
                                     <span className="text-[10px] text-emerald-600 mt-0.5">Mengekstraksi nominal, nama toko & kategori...</span>
                                 </div>
                             </div>
@@ -220,12 +220,12 @@ export default function AddTransactionModal({ isOpen, onClose, editing = null, i
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
-                                <span className="text-xs font-bold text-emerald-800">Scan Struk Instan dengan AI</span>
+                                 <span className="text-xs font-medium text-emerald-800">Scan Struk Instan dengan AI</span>
                                 <span className="text-[10px] text-emerald-600 mt-0.5">Unggah berkas foto struk belanja untuk autofill instan</span>
                                 <Button
                                     type="button"
                                     variant="primary"
-                                    className="mt-3 text-xs px-4 py-2 font-bold shadow-md bg-emerald-600 flex items-center gap-1.5"
+                                     className="mt-3 text-xs px-4 py-2 font-medium shadow-sm bg-emerald-600 flex items-center gap-1.5"
                                     onClick={() => fileInputRef.current?.click()}
                                     disabled={loading}
                                 >
@@ -235,7 +235,7 @@ export default function AddTransactionModal({ isOpen, onClose, editing = null, i
                         )}
 
                         {successMessage && (
-                            <div className="mt-3 px-3 py-1.5 bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-sm transition-all duration-300 animate-bounce">
+                             <div className="mt-3 px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-xs font-medium shadow-sm transition-all duration-300 animate-bounce">
                                 {successMessage}
                             </div>
                         )}
@@ -243,8 +243,8 @@ export default function AddTransactionModal({ isOpen, onClose, editing = null, i
                 )}
 
                 <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Tipe Transaksi</label>
-                    <div className="grid grid-cols-3 gap-1 bg-slate-100 rounded-xl p-1">
+                    <label className="ui-field-label block mb-1.5">Tipe Transaksi</label>
+                    <div className="ui-segmented grid grid-cols-3">
                         {TYPE_OPTIONS.map((opt) => (
                             <button
                                 key={opt.value}
@@ -256,9 +256,7 @@ export default function AddTransactionModal({ isOpen, onClose, editing = null, i
                                         setCategoryId(categories.find((c) => c.type === opt.value)?.id || '');
                                     }
                                 }}
-                                className={`py-2 rounded-lg text-sm font-semibold transition-all ${type === opt.value
-                                    ? 'bg-white text-emerald-700 shadow'
-                                    : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`ui-segmented-button ${type === opt.value ? 'is-active text-emerald-700' : ''}`}
                             >
                                 {opt.label}
                             </button>
@@ -288,7 +286,7 @@ export default function AddTransactionModal({ isOpen, onClose, editing = null, i
                 {type !== 'transfer' ? (
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Kategori</label>
+                            <label className="ui-field-label block mb-1.5">Kategori</label>
                             <select
                                 className={selectClass}
                                 value={categoryId}
@@ -302,7 +300,7 @@ export default function AddTransactionModal({ isOpen, onClose, editing = null, i
                             {errors.categoryId && <p className="mt-1 text-sm text-red-600">{errors.categoryId}</p>}
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Dompet</label>
+                            <label className="ui-field-label block mb-1.5">Dompet</label>
                             <select
                                 className={selectClass}
                                 value={walletId}
@@ -317,7 +315,7 @@ export default function AddTransactionModal({ isOpen, onClose, editing = null, i
                 ) : (
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Dari Dompet</label>
+                            <label className="ui-field-label block mb-1.5">Dari Dompet</label>
                             <select
                                 className={selectClass}
                                 value={fromWalletId}
@@ -330,7 +328,7 @@ export default function AddTransactionModal({ isOpen, onClose, editing = null, i
                             {errors.fromWalletId && <p className="mt-1 text-sm text-red-600">{errors.fromWalletId}</p>}
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ke Dompet</label>
+                            <label className="ui-field-label block mb-1.5">Ke Dompet</label>
                             <select
                                 className={selectClass}
                                 value={toWalletId}

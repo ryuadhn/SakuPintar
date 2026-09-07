@@ -1,24 +1,45 @@
 import React from 'react';
+import { Lightbulb } from 'lucide-react';
+import { currentMonthKey, monthKeyOf } from '../../Utils/format';
 
-export default function AIHabitBanner() {
+export default function AIHabitBanner({ categories = [], transactions = [] }) {
+    const monthlyExpenses = transactions.filter((transaction) => (
+        transaction.type === 'expense'
+        && monthKeyOf(transaction.date) === currentMonthKey()
+        && Number(transaction.amount) > 0
+    ));
+    const totalExpense = monthlyExpenses.reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
+    const spendingByCategory = monthlyExpenses.reduce((totals, transaction) => {
+        const categoryId = transaction.categoryId || 'uncategorized';
+        return {
+            ...totals,
+            [categoryId]: (totals[categoryId] || 0) + Number(transaction.amount || 0),
+        };
+    }, {});
+    const topCategory = Object.entries(spendingByCategory).sort(([, a], [, b]) => b - a)[0];
+    const topCategoryData = topCategory
+        ? categories.find((category) => category.id === topCategory[0])
+        : null;
+    const hasEnoughData = monthlyExpenses.length >= 3 && totalExpense > 0 && Boolean(topCategory);
+    const topCategoryName = topCategoryData?.name || 'kategori lain';
+    const topCategoryShare = hasEnoughData ? Math.round((topCategory[1] / totalExpense) * 100) : 0;
+
     return (
-        <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-950 text-white rounded-3xl p-8 shadow-xl relative overflow-hidden border border-emerald-900/30">
-            {/* Background elements */}
-            <div className="absolute right-0 top-0 w-64 h-full bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-            
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
-                <div className="max-w-xl">
-                    <div className="inline-flex items-center gap-2 bg-emerald-900/50 text-emerald-400 border border-emerald-500/30 text-[10px] uppercase font-bold tracking-widest px-3 py-1 rounded-full backdrop-blur-md mb-3.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        AI Spending Habits
-                    </div>
-                    <h2 className="text-xl md:text-2xl font-bold tracking-tight">Master Your Spending Habits</h2>
-                    <p className="text-slate-400 text-sm mt-1.5">SakuPintar menganalisis transaksi harian Anda secara otomatis untuk memberikan tips cerdas dalam meminimalisir pengeluaran impulsif.</p>
-                </div>
-                <button className="bg-emerald-600 hover:bg-emerald-500 transition-colors text-white font-bold text-sm px-6 py-3 rounded-xl shadow-md shadow-emerald-950/20 whitespace-nowrap">
-                    Aktifkan Analisis AI
-                </button>
+        <section className="ui-insight flex items-start gap-3 p-4 sm:p-5" aria-labelledby="category-insight-heading">
+            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${hasEnoughData ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
+                <Lightbulb className="h-4 w-4" aria-hidden="true" />
             </div>
-        </div>
+            <div className="min-w-0">
+                <p className="text-xs font-medium text-emerald-800">Insight kebiasaan belanja</p>
+                <h2 id="category-insight-heading" className="ui-section-title mt-1">
+                    {hasEnoughData ? 'Pola pengeluaran bulan ini' : 'Belum cukup data untuk membaca kebiasaan belanja.'}
+                </h2>
+                <p className="mt-1 text-sm leading-relaxed text-emerald-900/75">
+                    {hasEnoughData
+                        ? `${topCategoryName} menjadi kategori terbesar dengan sekitar ${topCategoryShare}% dari total pengeluaran bulan ini.`
+                        : 'Catat beberapa transaksi untuk mulai mendapatkan insight berdasarkan pola pengeluaran Anda.'}
+                </p>
+            </div>
+        </section>
     );
 }

@@ -66,9 +66,9 @@ export default function CategoryModal({ isOpen, onClose, editing = null }) {
 
                 {!editing && (
                     <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Tipe</label>
+                         <label className="ui-field-label block mb-1.5">Tipe</label>
                         <select
-                            className="block w-full rounded-xl border border-slate-200 p-2.5 text-sm bg-white focus:border-emerald-500 focus:ring-emerald-500 focus:outline-none"
+                             className="ui-control block w-full bg-white px-3 py-2.5"
                             value={type}
                             onChange={(e) => setType(e.target.value)}
                         >

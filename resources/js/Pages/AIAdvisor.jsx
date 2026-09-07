@@ -2,10 +2,10 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import { useFinance } from '../Store/FinanceContext';
 import { fmtIDR, currentMonthKey } from '../Utils/format';
-import { BrainCircuit, Send, Bot, User, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Send, Bot, User, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function AIAdvisor() {
-    const { transactions, categories, savingsGoals, getBudgetAlerts, monthStats } = useFinance();
+    const { transactions, categories, budgets, savingsGoals, getBudgetAlerts, monthStats } = useFinance();
     const chatEndRef = useRef(null);
 
     // ─── Financial calculations ───
@@ -14,10 +14,33 @@ export default function AIAdvisor() {
     const budgetAlerts = getBudgetAlerts();
     const overbudgetAlerts = budgetAlerts.filter(a => a.level === 'over');
 
-    const savingRate = stats.income > 0 ? Math.round((stats.net / stats.income) * 100) : 0;
+    const currentMonthTransactionCount = useMemo(
+        () => transactions.filter((transaction) => (
+            transaction.date?.slice(0, 7) === currentMonth
+            && (transaction.type === 'income' || transaction.type === 'expense')
+            && Number(transaction.amount) > 0
+        )).length,
+        [transactions, currentMonth]
+    );
+    const hasBudgetData = Object.values(budgets || {}).some((amount) => Number(amount) > 0);
+    const hasCashflowData = stats.income > 0 && stats.expense > 0;
+    const hasSufficientData = currentMonthTransactionCount > 0 && hasCashflowData && hasBudgetData;
+    const savingRate = stats.income > 0 ? Math.round((stats.net / stats.income) * 100) : null;
 
     // ─── AI Health Score Calculations ───
     const healthScoreData = useMemo(() => {
+        if (!hasSufficientData) {
+            return {
+                isSufficient: false,
+                score: null,
+                level: 'Belum cukup data',
+                colorClass: 'text-slate-700 bg-slate-50 border-slate-200',
+                barColor: 'bg-slate-300',
+                deductions: [],
+                additions: [],
+            };
+        }
+
         let score = 100;
         const deductions = [];
         const additions = [];
@@ -77,6 +100,7 @@ export default function AIAdvisor() {
         }
 
         return {
+            isSufficient: true,
             score: finalScore,
             level,
             colorClass,
@@ -84,17 +108,10 @@ export default function AIAdvisor() {
             deductions,
             additions
         };
-    }, [stats, savingRate, overbudgetAlerts, savingsGoals]);
+    }, [stats, savingRate, overbudgetAlerts, savingsGoals, hasSufficientData]);
 
     // ─── Chatbot State ───
-    const [messages, setMessages] = useState([
-        {
-            id: '1',
-            sender: 'bot',
-            text: 'Halo! Saya Asisten Keuangan AI SakuPintar. Saya telah menganalisis kondisi dompet, anggaran kategori, dan target tabungan Anda bulan ini. Silakan tanyakan hal-hal berikut untuk memulai:',
-            timestamp: new Date()
-        }
-    ]);
+    const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
 
@@ -135,7 +152,7 @@ export default function AIAdvisor() {
         const parts = text.split('**');
         return parts.map((part, idx) => {
             if (idx % 2 === 1) {
-                return <strong key={idx} className="font-extrabold text-slate-900">{part}</strong>;
+                return <strong key={idx} className="font-semibold text-slate-900">{part}</strong>;
             }
             const subParts = part.split('*');
             if (subParts.length > 1) {
@@ -175,19 +192,29 @@ export default function AIAdvisor() {
         return { name: expensesBreakdown[0].name, amount: expensesBreakdown[0].amount };
     }, [expensesBreakdown]);
 
+    const savingRateLabel = savingRate === null ? 'belum dapat dihitung' : `${savingRate}%`;
+
     // ─── AI Response Logic ───
     const generateBotResponse = (text) => {
         const normalized = text.toLowerCase();
         
         // 1. Cashflow query
         if (normalized.includes('kondisi') || normalized.includes('cashflow') || normalized.includes('arus kas') || normalized.includes('keuangan')) {
-            const statusText = stats.net >= 0 ? 'surplus' : 'defisit';
+            const statusText = stats.net > 0 ? 'surplus' : stats.net < 0 ? 'defisit' : 'netral';
+            const healthSummary = healthScoreData.isSufficient
+                ? `Skor kesehatan finansial saat ini **${healthScoreData.score}/100** (${healthScoreData.level}).`
+                : 'Skor kesehatan finansial belum tersedia karena data transaksi dan anggaran belum cukup.';
+            const nextStep = stats.net < 0 && hasCashflowData
+                ? 'Tinjau pengeluaran yang paling besar sebelum menambah komitmen baru.'
+                : !hasSufficientData
+                ? 'Catat transaksi pemasukan, pengeluaran, dan anggaran agar analisis lebih lengkap.'
+                : 'Gunakan ringkasan ini sebagai gambaran dari transaksi yang sudah tercatat.';
             return `Laporan Arus Kas Bulanan Anda:\n\n` +
                    `- **Total Pemasukan**: ${fmtIDR(stats.income)}\n` +
                    `- **Total Pengeluaran**: ${fmtIDR(stats.expense)}\n` +
-                   `- **Sisa Saldo Bersih**: ${stats.net >= 0 ? '+' : ''}${fmtIDR(stats.net)} (${statusText})\n` +
-                   `- **Tingkat Menabung**: ${savingRate}%\n\n` +
-                   `Kondisi finansial Anda saat ini bernilai **${healthScoreData.score}/100** (${healthScoreData.level}). ${stats.net < 0 ? 'Batasi pengeluaran esensial Anda minggu ini untuk memulihkan arus kas.' : 'Pengelolaan anggaran Anda berjalan cukup baik.'}`;
+                   `- **Sisa Saldo Bersih**: ${stats.net > 0 ? '+' : ''}${fmtIDR(stats.net)} (${statusText})\n` +
+                   `- **Tingkat Menabung**: ${savingRateLabel}\n\n` +
+                   `${healthSummary} ${nextStep}`;
         }
 
         // 2. Expense / top category query
@@ -221,17 +248,18 @@ export default function AIAdvisor() {
             }).join('\n');
 
             return `Daftar Progres Target Tabungan Anda:\n\n${activeGoalsText}\n\n` +
-                   `Rekomendasi:\n` +
-                   `Untuk target yang mendekati tenggat waktu, Anda bisa menyisihkan setoran otomatis berkala sebesar nominal bulanan yang telah disarankan.`;
+                   `Ringkasan ini mengikuti saldo dan target yang tercatat. Tinjau tenggat dan setoran setiap target untuk menentukan langkah berikutnya.`;
         }
 
         // 4. Saving advice / tips
         if (normalized.includes('tips') || normalized.includes('hemat') || normalized.includes('saran') || normalized.includes('cara')) {
-            const worstCategory = topCategory ? topCategory.name : 'pengeluaran gaya hidup';
-            return `Berikut adalah tips hemat yang disesuaikan khusus untuk Anda:\n\n` +
-                   `1. **Evaluasi Pengeluaran Terbesar**: Pola transaksi menunjukkan biaya tinggi di sektor **${worstCategory}**. Cobalah menantang diri Anda dengan metode *No-Spend Week* khusus untuk sektor ini.\n` +
-                   `2. **Aturan 50/30/20**: Alokasikan 50% pendapatan untuk kebutuhan dasar, 30% untuk keinginan, dan 20% langsung dimasukkan ke tabungan di awal bulan.\n` +
-                   `3. **Gunakan Fitur Multi-Wallet**: Pisahkan saldo tunai harian dengan dana simpanan darurat di rekening digital agar dana tidak terpakai secara tidak sengaja.`;
+            const categoryAdvice = topCategory
+                ? `Berdasarkan transaksi tercatat, pengeluaran terbesar berasal dari kategori **${topCategory.name}** sebesar **${fmtIDR(topCategory.amount)}**.`
+                : 'Belum ada kategori pengeluaran yang dapat dianalisis dari transaksi tercatat.';
+            return `Berikut beberapa langkah umum yang dapat dipertimbangkan:\n\n` +
+                   `1. **Tinjau pengeluaran terbesar**: ${categoryAdvice}\n` +
+                   `2. **Pisahkan kebutuhan dan keinginan** sebelum menetapkan batas pengeluaran bulan berikutnya.\n` +
+                   `3. **Catat transaksi secara rutin** agar saran berikutnya lebih sesuai dengan pola keuangan Anda.`;
         }
 
         // 5. Default fallback
@@ -268,67 +296,76 @@ export default function AIAdvisor() {
     };
 
     const quickPrompts = [
-        { label: 'Analisis Arus Kas', text: 'Bagaimana kondisi keuangan saya bulan ini?' },
-        { label: 'Kategori Terboros', text: 'Kategori pengeluaran apa yang paling boros?' },
-        { label: 'Cek Target Tabungan', text: 'Apakah target tabungan saya aman?' },
-        { label: 'Tips Hemat Cerdas', text: 'Berikan tips hemat praktis untuk saya.' }
+        { label: 'Analisis pengeluaran saya', text: 'Kategori pengeluaran apa yang paling besar?' },
+        { label: 'Kondisi tabungan saya', text: 'Bagaimana kondisi tabungan saya?' },
+        { label: 'Apa yang bisa saya hemat?', text: 'Apa yang bisa saya hemat?' },
+        { label: 'Cek perkembangan target saya', text: 'Cek perkembangan target saya.' }
     ];
 
     return (
         <AuthenticatedLayout>
-            <div className="flex flex-col gap-8 pb-12 h-[calc(100vh-120px)]">
+            <div className="app-page app-page-chat">
                 
                 {/* ── Header ── */}
-                <div>
-                    <h1 className="text-zinc-900 text-3xl font-bold leading-10 flex items-center gap-3">
-                        <BrainCircuit className="w-8 h-8 text-emerald-800" />
-                        Tanya AI
-                    </h1>
-                    <p className="text-neutral-700 text-sm mt-1">Konsultasikan kondisi anggaran, tabungan, dan kelayakan finansial Anda bersama asisten cerdas.</p>
+                <div className="app-page-header">
+                    <div>
+                        <h1 className="app-page-title">Tanya AI</h1>
+                        <p className="app-page-description">Konsultasikan kondisi anggaran, tabungan, dan kelayakan finansial Anda bersama asisten cerdas.</p>
+                    </div>
                 </div>
 
                 {/* ── Main Layout ── */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0 items-stretch">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 items-start">
                     
                     {/* ── Left Panel: Health Score Summary (4/12) ── */}
-                    <div className="lg:col-span-4 bg-white p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col gap-5 overflow-y-auto">
+                    <div className="ui-card lg:col-span-4 flex flex-col gap-4 overflow-y-auto">
                         <div>
-                            <h3 className="font-bold text-slate-800 text-base">Skor Kesehatan Finansial</h3>
-                            <p className="text-slate-500 text-xs mt-0.5">Analisis kesehatan finansial berdasarkan pola transaksi riil.</p>
+                            <h3 className="ui-section-title">Skor Kesehatan Finansial</h3>
+                            <p className="ui-section-description">Analisis kesehatan finansial berdasarkan pola transaksi riil.</p>
                         </div>
 
-                        {/* Large Score Circle */}
-                        <div className="flex flex-col items-center justify-center py-6 border-b border-stone-100">
-                            <div className="relative w-36 h-36 flex items-center justify-center">
-                                {/* SVG Background Circle */}
-                                <svg width="144" height="144" viewBox="0 0 36 36" className="transform -rotate-90">
-                                    <circle cx="18" cy="18" r="16" fill="transparent" stroke="#E2E8F0" strokeWidth="3" />
-                                    <circle 
-                                        cx="18" cy="18" r="16" 
-                                        fill="transparent" 
-                                        stroke={healthScoreData.score >= 80 ? '#0E6C4A' : healthScoreData.score >= 50 ? '#D97706' : '#DC2626'} 
-                                        strokeWidth="3" 
-                                        strokeDasharray="100 100"
-                                        strokeDashoffset={100 - healthScoreData.score}
-                                        className="transition-all duration-1000"
-                                    />
-                                </svg>
-                                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span className="text-slate-800 font-extrabold text-4xl leading-9">{healthScoreData.score}</span>
-                                    <span className="text-[10px] text-slate-400 font-bold uppercase mt-1">Skor Total</span>
+                        {/* Score or insufficient-data state */}
+                        <div className="flex flex-col items-center justify-center py-5 border-b border-stone-100 text-center">
+                            {healthScoreData.isSufficient ? (
+                                <div className="relative w-28 h-28 flex items-center justify-center">
+                                    <svg width="128" height="128" viewBox="0 0 36 36" className="transform -rotate-90" aria-hidden="true">
+                                        <circle cx="18" cy="18" r="16" fill="transparent" stroke="#E2E8F0" strokeWidth="3" />
+                                        <circle
+                                            cx="18" cy="18" r="16"
+                                            fill="transparent"
+                                            stroke={healthScoreData.score >= 80 ? '#0E6C4A' : healthScoreData.score >= 50 ? '#D97706' : '#DC2626'}
+                                            strokeWidth="3"
+                                            strokeDasharray="100 100"
+                                            strokeDashoffset={100 - healthScoreData.score}
+                                            className="transition-all duration-1000"
+                                        />
+                                    </svg>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                        <span className="text-slate-800 font-semibold text-3xl leading-8">{healthScoreData.score}</span>
+                                        <span className="text-[10px] text-slate-400 font-medium mt-1">Skor total</span>
+                                    </div>
                                 </div>
-                            </div>
-                            
-                            <span className={`mt-5 px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${healthScoreData.colorClass}`}>
+                            ) : (
+                                <div className="w-28 h-28 rounded-full border-[3px] border-slate-200 flex items-center justify-center">
+                                    <span className="text-slate-500 font-semibold text-3xl leading-8">--</span>
+                                </div>
+                            )}
+
+                            <span className={`ui-badge mt-3 ${healthScoreData.colorClass}`}>
                                 {healthScoreData.level}
                             </span>
+                            {!healthScoreData.isSufficient && (
+                                <p className="max-w-xs text-xs text-slate-500 leading-relaxed mt-3">
+                                    Tambahkan transaksi dan anggaran untuk mulai menghitung kondisi finansial Anda.
+                                </p>
+                            )}
                         </div>
 
                         {/* Analysis List */}
-                        <div className="space-y-4 flex-1">
+                        {healthScoreData.isSufficient && <div className="space-y-3 flex-1">
                             {/* Positif factors */}
                             <div className="space-y-2">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">Faktor Positif</span>
+                                <span className="text-xs font-medium text-emerald-800">Faktor positif</span>
                                 {healthScoreData.additions.length === 0 ? (
                                     <p className="text-xs text-slate-400">Belum ada faktor positif yang terdeteksi.</p>
                                 ) : (
@@ -343,7 +380,7 @@ export default function AIAdvisor() {
 
                             {/* Critical factors */}
                             <div className="space-y-2 pt-2">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Poin Evaluasi</span>
+                                <span className="text-xs font-medium text-rose-700">Poin evaluasi</span>
                                 {healthScoreData.deductions.length === 0 ? (
                                     <div className="flex items-start gap-2.5 text-xs text-slate-600">
                                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
@@ -358,24 +395,24 @@ export default function AIAdvisor() {
                                     ))
                                 )}
                             </div>
-                        </div>
+                        </div>}
 
                         {/* AI Smart Tip Widget */}
-                        <div className="mt-auto pt-5 border-t border-stone-100 flex flex-col gap-2.5">
+                        <div className="mt-auto pt-4 border-t border-stone-100 flex flex-col gap-2">
                             <div className="flex justify-between items-center">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-100">
-                                    AI Tip Hari Ini
+                                <span className="ui-badge text-emerald-800 bg-emerald-50 border-emerald-100">
+                                    Tips Keuangan
                                 </span>
                                 <button 
                                     onClick={() => setCurrentTipIndex((prev) => (prev + 1) % smartTips.length)}
-                                    className="text-[10px] font-bold text-slate-500 hover:text-emerald-800 transition-colors"
+                                    className="ui-button-compact inline-flex items-center text-slate-500 hover:text-emerald-800 transition-colors"
                                 >
                                     Tip Lainnya &rarr;
                                 </button>
                             </div>
-                            <div className="p-3.5 bg-[#F7FAF5] border border-stone-200 rounded-2xl">
-                                <h4 className="text-xs font-bold text-slate-800">{smartTips[currentTipIndex].title}</h4>
-                                <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                            <div className="ui-card-subtle p-3">
+                                <h4 className="ui-section-title ui-section-title-compact">{smartTips[currentTipIndex].title}</h4>
+                                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                                     {smartTips[currentTipIndex].desc}
                                 </p>
                             </div>
@@ -384,34 +421,63 @@ export default function AIAdvisor() {
                     </div>
 
                     {/* ── Right Panel: Chat Interface (8/12) ── */}
-                    <div className="lg:col-span-8 bg-white rounded-3xl border border-stone-200 shadow-sm flex flex-col overflow-hidden h-[500px] lg:h-auto">
+                    <div className="ui-card lg:col-span-8 p-0 flex flex-col overflow-hidden h-[500px] lg:h-[520px]">
                         {/* Chat Messages */}
-                        <div className="flex-1 p-6 overflow-y-auto space-y-4 bg-slate-50/50">
-                            {messages.map((msg) => {
-                                const isBot = msg.sender === 'bot';
-                                return (
-                                    <div key={msg.id} className={`flex items-start gap-3 ${isBot ? '' : 'flex-row-reverse'}`}>
-                                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border shadow-sm ${
-                                            isBot ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-slate-800 border-slate-700 text-white'
-                                        }`}>
-                                            {isBot ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
-                                        </div>
-                                        <div className={`max-w-[75%] p-4 rounded-2xl text-sm shadow-sm whitespace-pre-line leading-relaxed ${
-                                            isBot ? 'bg-white text-slate-800 rounded-tl-sm border border-stone-100' : 'bg-emerald-800 text-white rounded-tr-sm'
-                                        }`}>
-                                            {formatMessageText(msg.text)}
-                                        </div>
+                        <div className="flex-1 p-4 overflow-y-auto bg-slate-50/50" aria-live="polite">
+                            {messages.length === 0 ? (
+                                <div className="h-full flex flex-col items-center justify-center px-5 py-8 text-center">
+                                    <h2 className="ui-section-title text-base">Apa yang ingin Anda ketahui tentang keuangan Anda?</h2>
+                                    <p className="max-w-lg text-sm text-slate-500 leading-relaxed mt-2">
+                                        Saya dapat membantu membaca pola pengeluaran, tabungan, anggaran, dan target finansial berdasarkan data SakuPintar Anda.
+                                    </p>
+                                    {!hasSufficientData && (
+                                        <p className="max-w-lg text-xs text-slate-400 leading-relaxed mt-2">
+                                            Catat transaksi dan anggaran agar analisis kondisi finansial lebih akurat.
+                                        </p>
+                                    )}
+                                    <div className="flex flex-wrap justify-center gap-2 max-w-2xl mt-5">
+                                        {quickPrompts.map((p) => (
+                                            <button
+                                                key={p.label}
+                                                onClick={() => handleSend(p.text)}
+                                                disabled={isTyping}
+                                                className="ui-button-compact bg-white hover:bg-emerald-50 hover:text-emerald-800 border border-stone-200 hover:border-emerald-300 text-slate-600 inline-flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
+                                            >
+                                                {p.label}
+                                                <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                                            </button>
+                                        ))}
                                     </div>
-                                );
-                            })}
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {messages.map((msg) => {
+                                        const isBot = msg.sender === 'bot';
+                                        return (
+                                            <div key={msg.id} className={`flex items-start gap-3 ${isBot ? '' : 'flex-row-reverse'}`}>
+                                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border shadow-sm ${
+                                                    isBot ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-slate-800 border-slate-700 text-white'
+                                                }`}>
+                                                    {isBot ? <Bot className="w-4 h-4" aria-hidden="true" /> : <User className="w-4 h-4" aria-hidden="true" />}
+                                                </div>
+                                                <div className={`max-w-[78%] md:max-w-[68%] p-3 rounded-xl text-sm shadow-sm whitespace-pre-line leading-relaxed ${
+                                                    isBot ? 'bg-white text-slate-800 rounded-tl-sm border border-stone-100' : 'bg-emerald-800 text-white rounded-tr-sm'
+                                                }`}>
+                                                    {formatMessageText(msg.text)}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                             
                             {/* Typing Indicator */}
                             {isTyping && (
                                 <div className="flex items-start gap-3">
                                     <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border border-emerald-100 bg-emerald-50 text-emerald-800 shadow-sm">
-                                        <Bot className="w-4 h-4" />
+                                        <Bot className="w-4 h-4" aria-hidden="true" />
                                     </div>
-                                    <div className="bg-white border border-stone-100 text-slate-400 p-4 rounded-2xl rounded-tl-sm text-sm shadow-sm flex items-center gap-1">
+                                    <div className="bg-white border border-stone-100 text-slate-400 p-3 rounded-xl rounded-tl-sm text-sm shadow-sm flex items-center gap-1">
                                         <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                                         <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                                         <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
@@ -423,40 +489,43 @@ export default function AIAdvisor() {
                         </div>
 
                         {/* Quick Action Suggesters */}
-                        <div className="px-6 py-3 bg-white border-t border-stone-100 flex gap-2 overflow-x-auto scrollbar-none shrink-0">
-                            {quickPrompts.map((p, idx) => (
-                                <button
-                                    key={idx}
-                                    onClick={() => handleSend(p.text)}
-                                    disabled={isTyping}
-                                    className="px-4 py-2 bg-slate-50 hover:bg-emerald-50/50 hover:text-emerald-800 border border-stone-200 hover:border-emerald-300 rounded-full text-xs font-semibold text-slate-600 transition-all shrink-0 flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
-                                >
-                                    {p.label}
-                                    <ArrowRight className="w-3.5 h-3.5" />
-                                </button>
-                            ))}
-                        </div>
+                        {messages.length > 0 && (
+                            <div className="px-4 py-2.5 bg-white border-t border-stone-100 flex flex-wrap gap-2 shrink-0">
+                                {quickPrompts.map((p) => (
+                                    <button
+                                        key={p.label}
+                                        onClick={() => handleSend(p.text)}
+                                        disabled={isTyping}
+                                        className="ui-button-compact bg-slate-50 hover:bg-emerald-50/50 hover:text-emerald-800 border border-stone-200 hover:border-emerald-300 text-slate-600 transition-all inline-flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
+                                    >
+                                        {p.label}
+                                        <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                                    </button>
+                                ))}
+                            </div>
+                        )}
 
                         {/* Chat Input Bar */}
                         <form 
                             onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-                            className="px-6 py-4 bg-white border-t border-stone-200 flex gap-3 items-center shrink-0"
+                            className="px-4 py-3 bg-white border-t border-stone-200 flex gap-2 items-center shrink-0"
                         >
                             <input
                                 type="text"
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 disabled={isTyping}
+                                aria-label="Tulis pertanyaan ke asisten keuangan"
                                 placeholder="Ketik pesan Anda untuk berkonsultasi..."
-                                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-emerald-500 focus:ring-emerald-500 focus:outline-none disabled:opacity-50"
+                                className="ui-control flex-1 bg-slate-50 px-3 py-2 text-sm disabled:opacity-50"
                                 required
                             />
                             <button
                                 type="submit"
                                 disabled={isTyping || !input.trim()}
-                                className="w-12 h-12 bg-emerald-800 hover:bg-emerald-700 text-white rounded-xl flex items-center justify-center transition-colors shadow-sm disabled:bg-slate-200 disabled:text-slate-400 shrink-0"
+                                className="ui-button ui-button-icon inline-flex items-center justify-center bg-emerald-800 hover:bg-emerald-700 text-white transition-colors disabled:bg-slate-200 disabled:text-slate-400 shrink-0"
                             >
-                                <Send className="w-5.5 h-5.5" />
+                                <Send className="w-4 h-4" aria-hidden="true" />
                             </button>
                         </form>
                     </div>

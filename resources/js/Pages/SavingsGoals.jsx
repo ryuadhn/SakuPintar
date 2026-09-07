@@ -4,13 +4,9 @@ import GoalModal, { GOAL_ICONS } from '../Components/Savings/GoalModal';
 import GoalDetailModal from '../Components/Savings/GoalDetailModal';
 import CollaborateModal from '../Components/Savings/CollaborateModal';
 import { useFinance } from '../Store/FinanceContext';
-import { fmtIDR, formatMonthYear, monthsUntil } from '../Utils/format';
+import { fmtIDR, formatMonthYear, monthKeyOf, monthsUntil, todayISO, currentMonthKey } from '../Utils/format';
 
-// ─── Chart data ───────────────────────────────────────────────────────────────
-const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
-const collected = [10, 22, 35, 50, 65, 78, 92, 108, 0, 0, 0, 0];
-const projection = [10, 22, 35, 50, 65, 78, 92, 108, 120, 135, 148, 145];
-const maxVal = 165;
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
 
 // ─── Component: GoalCard ─────────────────────────────────────────────────────
 function GoalCard({ goal, onDelete, onClick, onCollaborate }) {
@@ -19,12 +15,12 @@ function GoalCard({ goal, onDelete, onClick, onCollaborate }) {
     return (
         <div 
             onClick={onClick}
-            className="bg-white rounded-2xl outline outline-1 outline-offset-[-1px] outline-stone-300 p-6 flex flex-col gap-5 shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] hover:shadow-md transition-all cursor-pointer hover:outline-emerald-600/40 hover:-translate-y-[1px]"
+            className="ui-card p-5 flex flex-col gap-4 transition-colors cursor-pointer hover:outline hover:outline-emerald-700/20"
         >
             {/* Top: Icon + Title + Progress */}
             <div className="flex justify-between items-start gap-3">
-                <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-14 h-14 bg-stone-100 rounded-2xl flex justify-center items-center shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-11 h-11 bg-stone-100 rounded-xl flex justify-center items-center shrink-0">
                         {(() => {
                             const Icon = GOAL_ICONS[goal.iconKey]?.Icon || GOAL_ICONS.home.Icon;
                             return <Icon className="w-6 h-6 text-emerald-800" strokeWidth={1.75} />;
@@ -32,9 +28,9 @@ function GoalCard({ goal, onDelete, onClick, onCollaborate }) {
                     </div>
                     <div className="flex flex-col min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                            <h4 className="text-zinc-900 text-lg font-bold leading-6 truncate">{goal.title}</h4>
+                            <h4 className="text-zinc-900 text-base font-semibold leading-5 truncate">{goal.title}</h4>
                             {goal.isShared && (
-                                <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/50 rounded text-[9px] font-bold uppercase tracking-wider shrink-0">
+                                <span className="ui-badge bg-emerald-50 text-emerald-700 border-emerald-200/50 shrink-0">
                                     Bersama
                                 </span>
                             )}
@@ -45,7 +41,7 @@ function GoalCard({ goal, onDelete, onClick, onCollaborate }) {
                     </div>
                 </div>
                 {isDone ? (
-                    <span className="shrink-0 self-start px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold uppercase leading-4 tracking-wider">
+                        <span className="ui-badge shrink-0 self-start bg-emerald-100 text-emerald-800 border-emerald-200">
                         Selesai
                     </span>
                 ) : (
@@ -55,7 +51,8 @@ function GoalCard({ goal, onDelete, onClick, onCollaborate }) {
                                 e.stopPropagation(); 
                                 onCollaborate(goal); 
                             }}
-                            className="p-2 rounded-lg text-stone-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                            className="ui-icon-button"
+                            aria-label={`Kelola kolaborasi target ${goal.title}`}
                             title="Kelola Kolaborasi Target"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -63,8 +60,8 @@ function GoalCard({ goal, onDelete, onClick, onCollaborate }) {
                             </svg>
                         </button>
                         <div className="flex flex-col items-end shrink-0">
-                            <span className="text-neutral-700 text-[10px] font-bold uppercase leading-4 tracking-wider">Progres</span>
-                            <span className="text-emerald-800 text-2xl font-bold leading-8">{goal.progress}%</span>
+                            <span className="text-neutral-700 text-xs font-medium">Progres</span>
+                            <span className="text-emerald-800 text-xl font-semibold leading-7">{goal.progress}%</span>
                         </div>
                     </div>
                 )}
@@ -85,14 +82,14 @@ function GoalCard({ goal, onDelete, onClick, onCollaborate }) {
             </div>
 
             {/* Footer Stats */}
-            <div className="pt-4 border-t border-stone-200 grid grid-cols-2 gap-4 items-center">
+            <div className="pt-3 border-t border-stone-200 grid grid-cols-2 gap-3 items-center">
                 <div className="flex flex-col">
-                    <span className="text-neutral-700 text-[10px] font-bold uppercase leading-4 tracking-wider">Setoran Bulanan</span>
-                    <span className="text-zinc-900 text-base font-semibold leading-6 mt-1">{fmtIDR(goal.monthly)}</span>
+                    <span className="text-neutral-700 text-xs font-medium">Setoran bulanan</span>
+                    <span className="text-zinc-900 text-sm font-semibold leading-5 mt-1">{fmtIDR(goal.monthly)}</span>
                 </div>
                 <div className="flex flex-col">
-                    <span className="text-neutral-700 text-[10px] font-bold uppercase leading-4 tracking-wider">Sisa Waktu</span>
-                    <span className="text-zinc-900 text-base font-semibold leading-6 mt-1">
+                    <span className="text-neutral-700 text-xs font-medium">Sisa waktu</span>
+                    <span className="text-zinc-900 text-sm font-semibold leading-5 mt-1">
                         {isDone ? 'Target Tercapai' : `${goal.remaining} Bulan`}
                     </span>
                 </div>
@@ -101,7 +98,8 @@ function GoalCard({ goal, onDelete, onClick, onCollaborate }) {
                         e.stopPropagation(); 
                         if (window.confirm(`Hapus target "${goal.title}"?`)) onDelete(goal.id); 
                     }}
-                    className="justify-self-end p-2 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    className="ui-icon-button ui-icon-button-danger justify-self-end"
+                    aria-label={`Hapus target ${goal.title}`}
                     title="Hapus target"
                 >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -114,26 +112,67 @@ function GoalCard({ goal, onDelete, onClick, onCollaborate }) {
 }
 
 // ─── Component: GrowthChart ──────────────────────────────────────────────────
-function GrowthChart() {
+const buildGrowthData = (goals) => {
+    const now = new Date();
+    const currentKey = currentMonthKey();
+    const totalCurrent = goals.reduce((sum, goal) => sum + Number(goal.current || 0), 0);
+    const totalMonthly = goals.reduce((sum, goal) => sum + Number(goal.monthly || 0), 0);
+    const history = goals.flatMap((goal) => (goal.history || []).map((entry) => ({
+        date: entry.date,
+        amount: Number(entry.amount || 0),
+    })));
+    const hasData = totalCurrent > 0 || totalMonthly > 0 || history.some((entry) => entry.amount !== 0);
+
+    const points = Array.from({ length: 9 }, (_, index) => {
+        const date = new Date(now.getFullYear(), now.getMonth() + index - 5, 1);
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const isProjection = index > 5;
+        const changesAfterMonth = history
+            .filter((entry) => monthKeyOf(entry.date) > key && monthKeyOf(entry.date) <= currentKey)
+            .reduce((sum, entry) => sum + entry.amount, 0);
+        const value = isProjection
+            ? totalCurrent + totalMonthly * (index - 5)
+            : Math.max(0, totalCurrent - changesAfterMonth);
+
+        return {
+            month: MONTH_LABELS[date.getMonth()],
+            isProjection,
+            value,
+            projectedValue: isProjection ? value : totalCurrent,
+        };
+    });
+
+    return { hasData, points };
+};
+
+function GrowthChart({ goals }) {
     const [hoveredIdx, setHoveredIdx] = useState(null);
     const chartW = 550;
     const chartH = 180;
 
-    // Calculate coordinates
+    const growthData = useMemo(() => buildGrowthData(goals), [goals]);
+
     const points = useMemo(() => {
-        return months.map((m, i) => {
-            const x = (i / 11) * (chartW - 40) + 20;
-            const yProj = chartH - (projection[i] / maxVal) * (chartH - 45) - 25;
-            const yColl = collected[i] > 0 
-                ? chartH - (collected[i] / maxVal) * (chartH - 45) - 25 
-                : null;
-            return { x, yProj, yColl, month: m, collVal: collected[i], projVal: projection[i] };
+        const maxVal = Math.max(...growthData.points.map((point) => Math.max(point.value, point.projectedValue)), 1);
+        const toY = (value) => chartH - (value / maxVal) * (chartH - 45) - 25;
+
+        return growthData.points.map((point, index) => {
+            const x = (index / (growthData.points.length - 1)) * (chartW - 40) + 20;
+            return {
+                ...point,
+                x,
+                yProj: index >= 5 ? toY(point.projectedValue) : null,
+                yColl: point.isProjection ? null : toY(point.value),
+                collVal: point.isProjection ? null : point.value,
+                projVal: point.projectedValue,
+            };
         });
-    }, []);
+    }, [growthData]);
 
     // Generate Path strings
     const projPathD = useMemo(() => {
-        return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yProj}`).join(' ');
+        const projectionPoints = points.filter((point) => point.yProj !== null);
+        return projectionPoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.yProj}`).join(' ');
     }, [points]);
 
     const collPathD = useMemo(() => {
@@ -150,22 +189,36 @@ function GrowthChart() {
         return `M ${first.x} ${chartH - 20} L ${first.x} ${first.yColl} ${lineParts} L ${last.x} ${chartH - 20} Z`;
     }, [points]);
 
+    if (!growthData.hasData) {
+        return (
+            <div className="ui-card w-full p-5 flex flex-col gap-4 h-full">
+                <div>
+                    <h3 className="ui-section-title">Proyeksi Pertumbuhan</h3>
+                    <p className="ui-section-description">Estimasi total tabungan berdasarkan kontribusi aktif.</p>
+                </div>
+                <div className="ui-empty flex-1 min-h-[180px]">
+                    <p>Proyeksi akan tersedia setelah ada saldo atau setoran pada target.</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="w-full bg-white rounded-3xl outline outline-1 outline-offset-[-1px] outline-stone-300 p-8 flex flex-col gap-6 h-full relative">
+        <div className="ui-card w-full p-5 flex flex-col gap-4 h-full relative">
             {/* Header */}
             <div className="flex justify-between items-center flex-wrap gap-4">
-                <div>
-                    <h3 className="text-zinc-900 text-2xl font-semibold leading-8">Proyeksi Pertumbuhan</h3>
-                    <p className="text-neutral-700 text-xs font-normal leading-4 mt-0.5">Estimasi total tabungan berdasarkan kontribusi aktif.</p>
+            <div>
+                <h3 className="ui-section-title">Proyeksi Pertumbuhan</h3>
+                <p className="ui-section-description">Estimasi total tabungan berdasarkan kontribusi aktif.</p>
                 </div>
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-1.5">
                         <div className="w-2.5 h-2.5 rounded-full bg-emerald-800" />
-                        <span className="text-neutral-700 text-[10px] font-bold uppercase tracking-wider">TERKUMPUL</span>
+                        <span className="text-neutral-700 text-[10px] font-medium">Terkumpul</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <div className="w-2.5 h-2.5 rounded-full bg-stone-200 border border-stone-300" />
-                        <span className="text-neutral-700 text-[10px] font-bold uppercase tracking-wider">PROYEKSI</span>
+                        <span className="text-neutral-700 text-[10px] font-medium">Proyeksi</span>
                     </div>
                 </div>
             </div>
@@ -216,7 +269,7 @@ function GrowthChart() {
                             strokeWidth="3.5" 
                         />
 
-                        {/* Current point (Ags) highlight dot */}
+                        {/* Current point highlight dot */}
                         {points.filter(p => p.yColl !== null).length > 0 && (() => {
                             const activeList = points.filter(p => p.yColl !== null);
                             const curPoint = activeList[activeList.length - 1];
@@ -279,18 +332,18 @@ function GrowthChart() {
                         const activeP = points[hoveredIdx];
                         const isColl = activeP.yColl !== null;
                         const val = isColl ? activeP.collVal : activeP.projVal;
-                        const displayVal = fmtIDR(val * 1000000); 
+                        const displayVal = fmtIDR(val);
                         
                         return (
                             <div 
-                                className="absolute bg-stone-900 text-white text-[11px] font-semibold px-3 py-1.5 rounded-xl shadow-lg pointer-events-none flex flex-col gap-0.5 border border-stone-800 z-30"
+                                className="ui-tooltip absolute bg-stone-900 text-white text-[11px] font-semibold px-3 py-1.5 pointer-events-none flex flex-col gap-0.5 border border-stone-800 z-30"
                                 style={{ 
                                     left: `${(activeP.x / chartW) * 100}%`,
                                     transform: 'translateX(-50%)',
                                     bottom: `${((chartH - (isColl ? activeP.yColl : activeP.yProj)) / chartH) * 100 + 4}%`
                                 }}
                             >
-                                <span className="text-[9px] uppercase tracking-wider text-stone-400">
+                                <span className="text-[9px] tracking-wider text-stone-400">
                                     {isColl ? 'Terkumpul' : 'Proyeksi'} ({activeP.month})
                                 </span>
                                 <span>{displayVal}</span>
@@ -304,39 +357,112 @@ function GrowthChart() {
 }
 
 // ─── Component: BestPerformer ────────────────────────────────────────────────
-function BestPerformer() {
+function BestPerformer({ goals }) {
+    const bestGoal = goals
+        .filter((goal) => goal.target > 0 && goal.progress > 0)
+        .sort((a, b) => b.progress - a.progress)[0];
+
     return (
-        <div className="bg-white rounded-3xl outline outline-1 outline-offset-[-1px] outline-stone-300 p-8 flex flex-col gap-6 h-full">
+        <div className="ui-card p-5 flex flex-col gap-4 h-full">
             <div>
-                <h3 className="text-zinc-900 text-2xl font-semibold leading-8">Paling Berhasil</h3>
-                <p className="text-neutral-700 text-xs font-normal leading-4 mt-1.5">Target dengan konsistensi tertinggi bulan ini.</p>
+                <h3 className="ui-section-title">Paling Berhasil</h3>
+                <p className="ui-section-description">Target aktif dengan progres tertinggi.</p>
             </div>
 
-            {/* Plane icon in ring */}
-            <div className="flex flex-col items-center gap-4 py-4 flex-1 justify-center">
-                <div className="relative">
-                    <div className="w-32 h-32 rounded-full border-[12px] border-emerald-800 flex justify-center items-center">
-                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-                            <path d="M10 40V35L16 30.8V23.6L0 30V24L16 12.8V4C16 2.9 16.3917 1.95833 17.175 1.175C17.9583 0.391667 18.9 0 20 0C21.1 0 22.0417 0.391667 22.825 1.175C23.6083 1.95833 24 2.9 24 4V12.8L40 24V30L24 23.6V30.8L30 35V40L20 37L10 40Z" fill="#0E6C4A" />
-                        </svg>
+            {bestGoal ? (
+                <div className="flex flex-col items-center gap-4 py-4 flex-1 justify-center">
+                    <div className="relative">
+                        <div className="w-24 h-24 rounded-full border-[8px] border-emerald-800 flex justify-center items-center">
+                            {(() => {
+                                const Icon = GOAL_ICONS[bestGoal.iconKey]?.Icon || GOAL_ICONS.other.Icon;
+                                return <Icon className="w-9 h-9 text-emerald-800" strokeWidth={1.75} />;
+                            })()}
+                        </div>
+                        <div className="absolute -top-2 -right-2 w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center">
+                            <span className="text-white text-xs font-bold leading-4">#1</span>
+                        </div>
                     </div>
-                    {/* #1 Badge */}
-                    <div className="absolute -top-2 -right-2 w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs font-bold leading-4">#1</span>
+                    <div className="flex flex-col items-center gap-1">
+                        <span className="text-zinc-900 text-xl font-semibold leading-7 text-center">{bestGoal.title}</span>
+                        <span className="text-emerald-800 text-sm font-semibold leading-5">{bestGoal.progress}% progres</span>
                     </div>
                 </div>
-                <div className="flex flex-col items-center">
-                    <span className="text-zinc-900 text-2xl font-semibold leading-8 text-center">Liburan ke Jepang</span>
-                    <span className="text-emerald-800 text-base font-semibold leading-6">120% Capaian Bulanan</span>
+            ) : (
+                <div className="ui-empty flex-1 min-h-[180px]">
+                    <p>Belum ada target aktif dengan progres yang tercatat.</p>
                 </div>
-            </div>
-
-            <button className="w-full py-4 rounded-xl outline outline-1 outline-offset-[-1px] outline-stone-300 text-zinc-900 text-sm font-semibold leading-4 tracking-wide hover:bg-stone-50 transition-colors">
-                Lihat Detail Laporan
-            </button>
+            )}
         </div>
     );
 }
+
+const monthlyContributionFor = (goal, monthKey) => (goal.history || [])
+    .filter((entry) => monthKeyOf(entry.date) === monthKey && Number(entry.amount || 0) > 0)
+    .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+
+const buildSavingsInsight = (goals) => {
+    const overdueGoal = [...goals]
+        .filter((goal) => goal.deadlineISO && goal.deadlineISO < todayISO())
+        .sort((a, b) => a.remaining - b.remaining)[0];
+
+    if (overdueGoal) {
+        const remaining = Math.max(0, overdueGoal.target - overdueGoal.current);
+        return {
+            title: `Target "${overdueGoal.title}" melewati tenggat.`,
+            description: `Masih tersisa ${fmtIDR(remaining)} dari target ${fmtIDR(overdueGoal.target)}. Perbarui rencana setoran atau tenggatnya.`,
+        };
+    }
+
+    const nearGoal = [...goals]
+        .filter((goal) => goal.progress >= 80)
+        .sort((a, b) => b.progress - a.progress)[0];
+
+    if (nearGoal) {
+        const remaining = Math.max(0, nearGoal.target - nearGoal.current);
+        return {
+            title: `Target "${nearGoal.title}" sudah mencapai ${nearGoal.progress}%.`,
+            description: `Tersisa ${fmtIDR(remaining)} untuk mencapai target ${fmtIDR(nearGoal.target)}.`,
+        };
+    }
+
+    const currentMonth = currentMonthKey();
+    const contributionGoal = [...goals]
+        .filter((goal) => Number(goal.monthly || 0) > 0)
+        .map((goal) => ({
+            goal,
+            contribution: monthlyContributionFor(goal, currentMonth),
+        }))
+        .filter(({ goal, contribution }) => contribution < Number(goal.monthly || 0))
+        .sort((a, b) => (a.contribution / a.goal.monthly) - (b.contribution / b.goal.monthly))[0];
+
+    if (contributionGoal) {
+        const { goal, contribution } = contributionGoal;
+        return {
+            title: `Setoran bulan ini untuk "${goal.title}" belum mencapai target.`,
+            description: `Terkumpul ${fmtIDR(contribution)} dari target bulanan ${fmtIDR(goal.monthly)}.`,
+        };
+    }
+
+    const projectionGoal = [...goals]
+        .filter((goal) => Number(goal.monthly || 0) > 0 && goal.target > goal.current)
+        .sort((a, b) => (a.target - a.current) / a.monthly - (b.target - b.current) / b.monthly)[0];
+
+    if (projectionGoal) {
+        const remaining = Math.max(0, projectionGoal.target - projectionGoal.current);
+        const estimatedMonths = Math.ceil(remaining / projectionGoal.monthly);
+        return {
+            title: `Estimasi "${projectionGoal.title}" tercapai dalam sekitar ${estimatedMonths} bulan.`,
+            description: `Perhitungan ini menggunakan sisa ${fmtIDR(remaining)} dan setoran bulanan ${fmtIDR(projectionGoal.monthly)}.`,
+        };
+    }
+
+    const totalCurrent = goals.reduce((sum, goal) => sum + Number(goal.current || 0), 0);
+    const totalTarget = goals.reduce((sum, goal) => sum + Number(goal.target || 0), 0);
+    return {
+        title: `${goals.length} target tabungan aktif sedang berjalan.`,
+        description: `Total terkumpul ${fmtIDR(totalCurrent)} dari target ${fmtIDR(totalTarget)}.`,
+    };
+};
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const SORT_OPTIONS = ['Tenggat Waktu', 'Progres', 'Jumlah Target'];
@@ -358,9 +484,15 @@ export default function SavingsGoals() {
     }, [sortOpen]);
 
     const viewGoals = useMemo(() => savingsGoals.map((g) => {
-        const progress = g.target > 0 ? Math.min(100, Math.round((g.current / g.target) * 100)) : 0;
+        const target = Number(g.target) || 0;
+        const current = Number(g.current) || 0;
+        const monthly = Number(g.monthly) || 0;
+        const progress = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
         return {
             ...g,
+            target,
+            current,
+            monthly,
             progress,
             remaining: monthsUntil(g.deadlineISO),
             deadlineLabel: formatMonthYear(g.deadlineISO),
@@ -374,6 +506,8 @@ export default function SavingsGoals() {
     const runningGoals = viewGoals.filter((g) => g.progress < 100);
     const doneGoals = viewGoals.filter((g) => g.progress >= 100);
     const visibleGoals = activeTab === 'berjalan' ? runningGoals : doneGoals;
+    const hasActiveGoals = runningGoals.length > 0;
+    const insight = hasActiveGoals ? buildSavingsInsight(runningGoals) : null;
 
     const sortedGoals = [...visibleGoals].sort((a, b) => {
         if (sortBy === 'Progres') return b.progress - a.progress;
@@ -382,25 +516,25 @@ export default function SavingsGoals() {
     });
 
     const totalCollected = viewGoals.reduce((s, g) => s + g.current, 0);
-    const avgProgress = viewGoals.length > 0
-        ? Math.round((viewGoals.reduce((s, g) => s + g.progress, 0) / viewGoals.length) * 10) / 10
+    const avgProgress = runningGoals.length > 0
+        ? Math.round((runningGoals.reduce((s, g) => s + g.progress, 0) / runningGoals.length) * 10) / 10
         : 0;
 
     return (
         <AuthenticatedLayout>
-            <div className="flex flex-col gap-10">
+            <div className="app-page">
 
                 {/* ── Header Section ── */}
-                <div className="flex justify-between items-end flex-wrap gap-4">
-                    <div className="space-y-1">
-                        <h1 className="text-zinc-900 text-3xl font-bold leading-10">Target Tabungan</h1>
-                        <p className="text-neutral-700 text-lg font-normal leading-7">
+                <div className="app-page-header">
+                    <div>
+                        <h1 className="app-page-title">Target Tabungan</h1>
+                        <p className="app-page-description">
                             Kelola tujuan finansial Anda secara presisi dan efisien.
                         </p>
                     </div>
                     <button
                         onClick={() => setModalOpen(true)}
-                        className="w-52 h-12 bg-emerald-800 rounded-xl flex items-center justify-center gap-2 text-white text-sm font-semibold tracking-wide shadow-[0px_8px_10px_-6px_rgba(14,108,74,0.10),0px_20px_25px_-5px_rgba(14,108,74,0.10)] hover:bg-emerald-700 transition-colors active:scale-[0.98]"
+                        className="ui-button bg-emerald-800 hover:bg-emerald-700 text-white flex items-center justify-center gap-2"
                     >
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                             <path d="M9 15H11V11H15V9H11V5H9V9H5V11H9V15ZM10 20C8.61667 20 7.31667 19.7375 6.1 19.2125C4.88333 18.6875 3.825 17.975 2.925 17.075C2.025 16.175 1.3125 15.1167 0.7875 13.9C0.2625 12.6833 0 11.3833 0 10C0 8.61667 0.2625 7.31667 0.7875 6.1C1.3125 4.88333 2.025 3.825 2.925 2.925C3.825 2.025 4.88333 1.3125 6.1 0.7875C7.31667 0.2625 8.61667 0 10 0C11.3833 0 12.6792 0.2625 13.9 0.7875C15.1167 1.3125 16.175 2.025 17.075 2.925C17.975 3.825 18.6875 4.88333 19.2125 6.1C19.7375 7.31667 20 8.61667 20 10C20 11.3667 19.7375 12.6583 19.2125 13.875C18.6875 15.0917 17.975 16.1542 17.075 17.0625C16.175 17.9708 15.1167 18.6875 13.9 19.2125C12.6833 19.7375 11.3833 20 10 20ZM10 18C12.2333 18 14.125 17.225 15.675 15.675C17.225 14.125 18 12.2333 18 10C18 7.76667 17.225 5.875 15.675 4.325C14.125 2.775 12.2333 2 10 2C7.76667 2 5.875 2.775 4.325 4.325C2.775 5.875 2 7.76667 2 10C2 12.2333 2.775 14.125 4.325 15.675C5.875 17.225 7.76667 18 10 18Z" fill="white" />
@@ -410,10 +544,10 @@ export default function SavingsGoals() {
                 </div>
 
                 {/* ── Summary Bento Grid ── */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {/* Total Terkumpul */}
-                    <div className="p-6 bg-white rounded-2xl shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] outline outline-1 outline-offset-[-1px] outline-stone-300 flex items-center gap-5">
-                        <div className="w-14 h-14 bg-emerald-300/20 rounded-2xl flex items-center justify-center shrink-0">
+                    <div className="ui-stat-card flex items-center gap-4">
+                        <div className="w-11 h-11 bg-emerald-300/20 rounded-xl flex items-center justify-center shrink-0">
                             <svg width="25" height="25" viewBox="0 0 25 25" fill="none">
                                 <path d="M3.75 20V11.25H6.25V20H3.75ZM11.25 20V11.25H13.75V20H11.25ZM0 25V22.5H25V25H0ZM18.75 20V11.25H21.25V20H18.75ZM0 8.75V6.25L12.5 0L25 6.25V8.75H0Z" fill="#0E6C4A" />
                             </svg>
@@ -425,8 +559,8 @@ export default function SavingsGoals() {
                     </div>
 
                     {/* Target Aktif */}
-                    <div className="p-6 bg-white rounded-2xl shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] outline outline-1 outline-offset-[-1px] outline-stone-300 flex items-center gap-5">
-                        <div className="w-14 h-14 bg-indigo-100/30 rounded-2xl flex items-center justify-center shrink-0">
+                    <div className="ui-stat-card flex items-center gap-4">
+                        <div className="w-11 h-11 bg-indigo-100/30 rounded-xl flex items-center justify-center shrink-0">
                             <svg width="19" height="22" viewBox="0 0 19 22" fill="none">
                                 <path d="M0 21.25V0H11.25L11.75 2.5H18.75V15H10L9.5 12.5H2.5V21.25H0Z" fill="#565E74" />
                             </svg>
@@ -438,8 +572,8 @@ export default function SavingsGoals() {
                     </div>
 
                     {/* Rerata Progres */}
-                    <div className="p-6 bg-white rounded-2xl shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] outline outline-1 outline-offset-[-1px] outline-stone-300 flex items-center gap-5">
-                        <div className="w-14 h-14 bg-gray-400/30 rounded-2xl flex items-center justify-center shrink-0">
+                    <div className="ui-stat-card flex items-center gap-4">
+                        <div className="w-11 h-11 bg-gray-400/30 rounded-xl flex items-center justify-center shrink-0">
                             <svg width="23" height="23" viewBox="0 0 23 23" fill="none">
                                 <path d="M5 17.5H7.5V11.25H5V17.5ZM15 17.5H17.5V5H15V17.5ZM10 17.5H12.5V13.75H10V17.5ZM10 11.25H12.5V8.75H10V11.25ZM2.5 22.5C1.8125 22.5 1.22396 22.2552 0.734375 21.7656C0.244792 21.276 0 20.6875 0 20V2.5C0 1.8125 0.244792 1.22396 0.734375 0.734375C1.22396 0.244792 1.8125 0 2.5 0H20C20.6875 0 21.276 0.244792 21.7656 0.734375C22.2552 1.22396 22.5 1.8125 22.5 2.5V20C22.5 20.6875 22.2552 21.276 21.7656 21.7656C21.276 22.2552 20.6875 22.5 20 22.5H2.5Z" fill="#466554" />
                             </svg>
@@ -452,39 +586,33 @@ export default function SavingsGoals() {
                 </div>
 
                 {/* ── Smart Insight Banner ── */}
-                <div className="w-full px-8 py-8 bg-emerald-800 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 overflow-hidden">
-                    <div className="max-w-[576px] flex flex-col gap-3">
-                        {/* Badge */}
-                        <div className="self-start px-3 py-1 bg-white/10 rounded-full backdrop-blur-[6px] flex items-center gap-2">
-                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                                <path d="M10.5 4.66667L9.77083 3.0625L8.16667 2.33333L9.77083 1.60417L10.5 0L11.2292 1.60417L12.8333 2.33333L11.2292 3.0625L10.5 4.66667ZM10.5 12.8333L9.77083 11.2292L8.16667 10.5L9.77083 9.77083L10.5 8.16667L11.2292 9.77083L12.8333 10.5L11.2292 11.2292L10.5 12.8333ZM4.66667 11.0833L3.20833 7.875L0 6.41667L3.20833 4.95833L4.66667 1.75L6.125 4.95833L9.33333 6.41667L6.125 7.875L4.66667 11.0833ZM4.66667 8.25417L5.25 7L6.50417 6.41667L5.25 5.83333L4.66667 4.57917L4.08333 5.83333L2.82917 6.41667L4.08333 7L4.66667 8.25417Z" fill="white" />
+                {insight && (
+                    <div className="ui-insight w-full px-5 py-4 flex items-start gap-3 overflow-hidden">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 text-emerald-800">
+                            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                                <path d="M7.5 1.25a6.25 6.25 0 1 0 0 12.5 6.25 6.25 0 0 0 0-12.5Zm0 3.125v3.75m0 2.5h.006" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                             </svg>
-                            <span className="text-white text-xs font-bold uppercase leading-4 tracking-wider">INSIGHT PINTAR</span>
                         </div>
-                        <h2 className="text-white text-2xl font-semibold leading-8">
-                            Target &quot;Liburan ke Jepang&quot; hampir tercapai!
-                        </h2>
-                        <p className="text-white/90 text-base font-normal leading-6">
-                            Dengan menambah Rp 450.000 pada kontribusi bulan depan, Anda akan mencapai target 2 bulan lebih cepat dari jadwal semula.
-                        </p>
+                        <div className="max-w-[720px] flex flex-col gap-1">
+                            <div className="flex items-center gap-2 text-xs font-medium text-emerald-800">
+                                <span>Insight berdasarkan target Anda</span>
+                            </div>
+                            <h2 className="ui-section-title">{insight.title}</h2>
+                            <p className="text-emerald-900/80 text-sm leading-5">{insight.description}</p>
+                        </div>
                     </div>
-                    <button className="px-6 py-3 bg-white rounded-xl text-emerald-800 text-sm font-semibold leading-4 tracking-wide hover:bg-stone-50 transition-colors shrink-0 active:scale-[0.98]">
-                        Optimalkan Sekarang
-                    </button>
-                </div>
+                )}
 
                 {/* ── Main Interactive Section ── */}
-                <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-4">
                     {/* Tab + Sort controls */}
                     <div className="flex justify-between items-center flex-wrap gap-4">
                         {/* Tabs */}
-                        <div className="p-1 bg-stone-200/70 rounded-xl flex items-center gap-1">
+                        <div className="ui-segmented">
                             <button
                                 onClick={() => setActiveTab('berjalan')}
-                                className={`px-5 py-2 rounded-lg text-sm tracking-wide transition-all ${activeTab === 'berjalan'
-                                    ? 'bg-white shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] text-emerald-800 font-bold'
-                                    : 'text-neutral-700 font-semibold hover:text-zinc-900'
-                                    }`}
+                                aria-pressed={activeTab === 'berjalan'}
+                                className={`ui-segmented-button ${activeTab === 'berjalan' ? 'is-active' : ''}`}
                             >
                                 Sedang Berjalan
                                 <span className={`ml-2 text-xs ${activeTab === 'berjalan' ? 'text-emerald-700/70' : 'text-neutral-500'}`}>
@@ -493,10 +621,8 @@ export default function SavingsGoals() {
                             </button>
                             <button
                                 onClick={() => setActiveTab('selesai')}
-                                className={`px-5 py-2 rounded-lg text-sm tracking-wide transition-all ${activeTab === 'selesai'
-                                    ? 'bg-white shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] text-emerald-800 font-bold'
-                                    : 'text-neutral-700 font-semibold hover:text-zinc-900'
-                                    }`}
+                                aria-pressed={activeTab === 'selesai'}
+                                className={`ui-segmented-button ${activeTab === 'selesai' ? 'is-active' : ''}`}
                             >
                                 Selesai
                                 <span className={`ml-2 text-xs ${activeTab === 'selesai' ? 'text-emerald-700/70' : 'text-neutral-500'}`}>
@@ -516,7 +642,7 @@ export default function SavingsGoals() {
                             <div className="relative">
                                 <button
                                     onClick={(e) => { e.stopPropagation(); setSortOpen((v) => !v); }}
-                                    className="pl-4 pr-3 py-2.5 bg-white rounded-xl outline outline-1 outline-offset-[-1px] outline-stone-300 flex items-center justify-between gap-2 w-44 hover:bg-stone-50 transition-colors"
+                                     className="ui-button w-44 justify-between border border-stone-300 bg-white text-zinc-900 hover:bg-stone-50"
                                 >
                                     <span className="text-zinc-900 text-sm font-semibold leading-4 tracking-wide whitespace-nowrap">{sortBy}</span>
                                     <svg
@@ -527,12 +653,12 @@ export default function SavingsGoals() {
                                     </svg>
                                 </button>
                                 {sortOpen && (
-                                    <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl outline outline-1 outline-stone-300 shadow-lg z-20 overflow-hidden py-1">
+                                    <div className="ui-popover absolute right-0 mt-2 w-44 bg-white outline outline-1 outline-stone-300 z-20 overflow-hidden py-1">
                                         {SORT_OPTIONS.map((opt) => (
                                             <button
                                                 key={opt}
                                                 onClick={() => { setSortBy(opt); setSortOpen(false); }}
-                                                className={`block w-full text-left px-4 py-2.5 text-sm font-semibold hover:bg-stone-50 transition-colors ${opt === sortBy ? 'text-emerald-800' : 'text-zinc-900'
+                                             className={`ui-menu-item ${opt === sortBy ? 'is-active' : ''} ${opt === sortBy ? 'text-emerald-800' : 'text-zinc-900'
                                                     }`}
                                             >
                                                 {opt}
@@ -546,11 +672,24 @@ export default function SavingsGoals() {
 
                     {/* Goal Cards Grid */}
                     {sortedGoals.length === 0 ? (
-                        <div className="bg-white rounded-2xl outline outline-1 outline-dashed outline-stone-300 py-16 text-center">
-                            <p className="text-neutral-500 text-sm">Belum ada target di kategori ini.</p>
+                        <div className="ui-empty flex flex-col items-center gap-3 text-center">
+                            {activeTab === 'berjalan' ? (
+                                <>
+                                    <p className="text-base font-semibold text-zinc-900">Belum ada target tabungan aktif</p>
+                                    <p>Buat target pertama Anda untuk mulai memantau progres, proyeksi tabungan, dan insight finansial.</p>
+                                    <button
+                                        onClick={() => setModalOpen(true)}
+                                        className="ui-button bg-emerald-800 hover:bg-emerald-700 text-white mt-1"
+                                    >
+                                        + Tambah Target
+                                    </button>
+                                </>
+                            ) : (
+                                <p>Belum ada target tabungan yang selesai.</p>
+                            )}
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             {sortedGoals.map((g) => (
                                 <GoalCard 
                                     key={g.id} 
@@ -565,14 +704,16 @@ export default function SavingsGoals() {
                 </div>
 
                 {/* ── Lower: Proyeksi + Best Performer ── */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2">
-                        <GrowthChart />
+                {hasActiveGoals && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div className="lg:col-span-2">
+                            <GrowthChart goals={runningGoals} />
+                        </div>
+                        <div>
+                            <BestPerformer goals={runningGoals} />
+                        </div>
                     </div>
-                    <div>
-                        <BestPerformer />
-                    </div>
-                </div>
+                )}
 
             </div>
 

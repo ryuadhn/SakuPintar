@@ -43,12 +43,12 @@ export default function CollaborateModal({ isOpen, onClose, goal, onSave }) {
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Undang Pasangan (Kolaborasi)" wide={false}>
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Info Card */}
-                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex gap-3 text-xs leading-relaxed text-slate-600">
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex gap-3 text-xs leading-relaxed text-slate-600">
                     <Info className="w-5 h-5 text-emerald-800 shrink-0 mt-0.5" />
                     <div>
-                        <p className="font-bold text-slate-800 mb-1">Cara Kerja Tabungan Bersama:</p>
+                        <p className="font-semibold text-slate-800 mb-1">Cara Kerja Tabungan Bersama:</p>
                         <p>Masukkan email pasangan Anda yang telah terdaftar di SakuPintar. Target tabungan **"{goal.title}"** ini otomatis akan terbagi secara langsung di halaman akun pasangan Anda secara *real-time*.</p>
                     </div>
                 </div>
@@ -56,12 +56,12 @@ export default function CollaborateModal({ isOpen, onClose, goal, onSave }) {
                 {/* State: Connected */}
                 {goal.isShared && goal.partnerEmail ? (
                     <div className="space-y-4">
-                        <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3">
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex items-center gap-3">
                             <CheckCircle2 className="w-6 h-6 text-emerald-700 shrink-0" />
                             <div>
-                                <h6 className="font-bold text-emerald-800 text-xs">Target Terhubung Bersama</h6>
+                            <h6 className="font-semibold text-emerald-800 text-xs">Target Terhubung Bersama</h6>
                                 <p className="text-[11px] text-emerald-700 mt-0.5">
-                                    Dibagikan dengan: <strong className="font-bold">{goal.partnerEmail}</strong>
+                                    Dibagikan dengan: <strong className="font-semibold">{goal.partnerEmail}</strong>
                                 </p>
                             </div>
                         </div>
@@ -71,7 +71,7 @@ export default function CollaborateModal({ isOpen, onClose, goal, onSave }) {
                                 type="button"
                                 variant="secondary"
                                 onClick={handleStopCollaboration}
-                                className="w-full py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-50 hover:text-rose-800 border-rose-100"
+                                className="w-full py-2.5 text-xs font-medium text-rose-700 hover:bg-rose-50 hover:text-rose-800 border-rose-100"
                             >
                                 Hentikan Kolaborasi
                             </Button>
@@ -79,7 +79,7 @@ export default function CollaborateModal({ isOpen, onClose, goal, onSave }) {
                                 type="button"
                                 variant="secondary"
                                 onClick={onClose}
-                                className="w-full py-2.5 text-xs font-bold text-slate-700"
+                                className="w-full py-2.5 text-xs font-medium text-slate-700"
                             >
                                 Tutup
                             </Button>

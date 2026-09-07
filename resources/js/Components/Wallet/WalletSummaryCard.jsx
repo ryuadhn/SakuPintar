@@ -20,15 +20,15 @@ export default function WalletSummaryCard({ title, amount, type = 'income', icon
     }).format(amount);
 
     return (
-        <div className={`rounded-2xl p-6 shadow-sm transition-all duration-300 hover:shadow-md ${containerStyle}`}>
+        <div className={`ui-stat-card transition-colors duration-200 ${containerStyle}`}>
             <div className="flex justify-between items-start">
                 <div>
-                    <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">{title}</span>
-                    <h3 className="text-2xl font-bold text-slate-800 mt-1">{formattedAmount}</h3>
+                    <span className="text-slate-500 text-xs font-medium">{title}</span>
+                    <h3 className="text-xl font-semibold text-slate-800 mt-1">{formattedAmount}</h3>
                 </div>
                 {Icon && (
-                    <div className={`p-3 rounded-xl ${iconBg}`}>
-                        <Icon className="w-6 h-6" />
+                    <div className={`p-2.5 rounded-lg ${iconBg}`}>
+                        <Icon className="w-5 h-5" />
                     </div>
                 )}
             </div>

@@ -12,7 +12,7 @@ const TYPE_OPTIONS = [
     { value: 'other', label: 'Lainnya' },
 ];
 
-export default function ReminderModal({ isOpen, onClose, editing = null, initialDate = todayISO() }) {
+export default function ReminderModal({ isOpen, onClose, editing = null, initialDate = todayISO(), taskOnly = false }) {
     const {
         addReminder,
         updateReminder,
@@ -26,10 +26,18 @@ export default function ReminderModal({ isOpen, onClose, editing = null, initial
     const [time, setTime] = useState('');
     const [type, setType] = useState('task');
     const [notes, setNotes] = useState('');
+    const [priority, setPriority] = useState('');
     const [amount, setAmount] = useState('');
     const [errors, setErrors] = useState({});
     const formRef = useRef(null);
     const formBusy = calendarBusy || syncLoading;
+    const modalTitle = taskOnly
+        ? (editing ? 'Edit Tugas' : 'Tambah Tugas')
+        : (editing ? 'Edit Pengingat' : 'Tambah Pengingat');
+    const saveLabel = taskOnly
+        ? (editing ? 'Simpan Perubahan' : 'Simpan Tugas')
+        : (editing ? 'Simpan Perubahan' : 'Simpan Pengingat');
+    const modalInputClass = taskOnly ? 'min-h-[44px]' : '';
 
     useEffect(() => {
         if (!isOpen) return;
@@ -39,8 +47,9 @@ export default function ReminderModal({ isOpen, onClose, editing = null, initial
             setTitle(editing.title || '');
             setDate(editing.date || todayISO());
             setTime(editing.time || '');
-            setType(editing.type || 'other');
+            setType(taskOnly ? 'task' : editing.type || 'other');
             setNotes(editing.notes || '');
+            setPriority(editing.priority || '');
             setAmount(editing.amount === null || editing.amount === undefined ? '' : String(editing.amount));
         } else {
             setTitle('');
@@ -48,10 +57,11 @@ export default function ReminderModal({ isOpen, onClose, editing = null, initial
             setTime('');
             setType('task');
             setNotes('');
+            setPriority('');
             setAmount('');
         }
         setErrors({});
-    }, [isOpen, editing, initialDate, clearCalendarError]);
+    }, [isOpen, editing, initialDate, clearCalendarError, taskOnly]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -74,8 +84,9 @@ export default function ReminderModal({ isOpen, onClose, editing = null, initial
             title: title.trim(),
             date,
             time: time || null,
-            type,
+            type: taskOnly ? 'task' : type,
             notes: notes.trim() || null,
+            priority: (taskOnly || type === 'task') ? priority || null : null,
             amount: type === 'finance' && amount ? numericAmount : null,
         };
 
@@ -88,10 +99,10 @@ export default function ReminderModal({ isOpen, onClose, editing = null, initial
         }
     };
 
-    const selectClass = "block min-h-[44px] w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm text-slate-900 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-emerald-500";
+    const selectClass = "ui-control block min-h-[44px] w-full bg-white px-3 py-2.5 text-sm text-slate-900";
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={editing ? 'Edit Pengingat' : 'Tambah Pengingat'}>
+        <Modal isOpen={isOpen} onClose={onClose} title={modalTitle}>
             <form ref={formRef} className="space-y-4" onSubmit={handleSubmit} noValidate>
                 {calendarError && (
                     <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold leading-relaxed text-rose-800">
@@ -100,10 +111,11 @@ export default function ReminderModal({ isOpen, onClose, editing = null, initial
                 )}
 
                 <Input
-                    label="Judul Pengingat"
+                    label={taskOnly ? 'Judul Tugas' : 'Judul Pengingat'}
                     id="reminder-title"
                     data-autofocus="true"
-                    placeholder="Contoh: Bayar listrik"
+                    placeholder={taskOnly ? 'Contoh: Kerjakan laporan PBO' : 'Contoh: Bayar listrik'}
+                    inputClassName={modalInputClass}
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     disabled={formBusy}
@@ -116,6 +128,7 @@ export default function ReminderModal({ isOpen, onClose, editing = null, initial
                         label="Tanggal"
                         id="reminder-date"
                         type="date"
+                        inputClassName={modalInputClass}
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
                         disabled={formBusy}
@@ -126,30 +139,51 @@ export default function ReminderModal({ isOpen, onClose, editing = null, initial
                         label="Waktu (Opsional)"
                         id="reminder-time"
                         type="time"
+                        inputClassName={modalInputClass}
                         value={time}
                         onChange={(e) => setTime(e.target.value)}
                         disabled={formBusy}
                     />
                 </div>
 
-                <div>
-                    <label htmlFor="reminder-type" className="mb-1.5 block text-sm font-semibold text-slate-700">Jenis agenda</label>
-                    <select
-                        id="reminder-type"
-                        className={selectClass}
-                        value={type}
-                        disabled={formBusy}
-                        onChange={(e) => {
-                            setType(e.target.value);
-                            if (e.target.value !== 'finance') setAmount('');
-                        }}
-                    >
-                        {TYPE_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                    </select>
-                    <p className="mt-1.5 text-xs leading-relaxed text-slate-500">Jenis ini membantu membedakan agenda saat Anda melihat kalender.</p>
-                </div>
+                {!taskOnly && (
+                    <div>
+                        <label htmlFor="reminder-type" className="ui-field-label mb-1 block">Jenis agenda</label>
+                        <select
+                            id="reminder-type"
+                            className={selectClass}
+                            value={type}
+                            disabled={formBusy}
+                            onChange={(e) => {
+                                setType(e.target.value);
+                                if (e.target.value !== 'finance') setAmount('');
+                            }}
+                        >
+                            {TYPE_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                        </select>
+                        <p className="mt-1.5 text-xs leading-relaxed text-slate-500">Jenis ini membantu membedakan agenda saat Anda melihat kalender.</p>
+                    </div>
+                )}
+
+                {(taskOnly || type === 'task') && (
+                    <div>
+                        <label htmlFor="reminder-priority" className="ui-field-label mb-1 block">Prioritas (Opsional)</label>
+                        <select
+                            id="reminder-priority"
+                            className={selectClass}
+                            value={priority}
+                            disabled={formBusy}
+                            onChange={(e) => setPriority(e.target.value)}
+                        >
+                            <option value="">Tanpa prioritas</option>
+                            <option value="low">Rendah</option>
+                            <option value="medium">Sedang</option>
+                            <option value="high">Tinggi</option>
+                        </select>
+                    </div>
+                )}
 
                 {type === 'finance' && (
                     <Input
@@ -157,6 +191,7 @@ export default function ReminderModal({ isOpen, onClose, editing = null, initial
                         id="reminder-amount"
                         type="number"
                         inputMode="numeric"
+                        inputClassName={modalInputClass}
                         min="1"
                         placeholder="Contoh: 350000"
                         value={amount}
@@ -167,7 +202,7 @@ export default function ReminderModal({ isOpen, onClose, editing = null, initial
                 )}
 
                 <div>
-                    <label htmlFor="reminder-notes" className="block text-sm font-semibold text-slate-700 mb-1.5">Catatan (Opsional)</label>
+                    <label htmlFor="reminder-notes" className="ui-field-label mb-1 block">Catatan (Opsional)</label>
                     <textarea
                         id="reminder-notes"
                         value={notes}
@@ -175,14 +210,14 @@ export default function ReminderModal({ isOpen, onClose, editing = null, initial
                         disabled={formBusy}
                         placeholder="Tambahkan detail kecil..."
                         rows={3}
-                        className="block w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 placeholder:text-slate-500 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-emerald-500"
+                        className="ui-control block w-full resize-none bg-white p-3 text-sm text-slate-900 placeholder:text-slate-500"
                     />
                 </div>
 
                 <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
                     <Button type="button" variant="secondary" onClick={onClose} disabled={formBusy} className="min-h-[44px] px-5 py-2.5 disabled:pointer-events-none disabled:opacity-60">Batal</Button>
-                    <Button type="submit" variant="primary" disabled={formBusy} className="min-h-[44px] bg-emerald-600 px-5 py-2.5 disabled:pointer-events-none disabled:opacity-60">
-                        {syncLoading ? 'Memuat...' : calendarBusy ? 'Menyimpan...' : editing ? 'Simpan Perubahan' : 'Simpan Pengingat'}
+                    <Button type="submit" variant="primary" disabled={formBusy} aria-busy={formBusy} className="min-h-[44px] bg-emerald-600 px-5 py-2.5 disabled:pointer-events-none disabled:opacity-60">
+                        {syncLoading ? 'Memuat...' : calendarBusy ? 'Menyimpan...' : saveLabel}
                     </Button>
                 </div>
             </form>

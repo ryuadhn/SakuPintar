@@ -64,14 +64,14 @@ export default function WalletModal({ isOpen, onClose, editing = null }) {
                 />
 
                 <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">Warna Dompet</label>
+                     <label className="ui-field-label block mb-2">Warna Dompet</label>
                     <div className="grid grid-cols-7 gap-2">
                         {WALLET_COLORS.map((item) => (
                             <button
                                 key={item}
                                 type="button"
                                 onClick={() => setColor(item)}
-                                className={`h-10 rounded-xl border transition-all ${color === item ? 'border-slate-900 ring-2 ring-slate-900/10' : 'border-slate-200'}`}
+                                 className={`min-h-[44px] rounded-lg border transition-all ${color === item ? 'border-slate-900 ring-2 ring-slate-900/10' : 'border-slate-200'}`}
                                 style={{ backgroundColor: item }}
                                 title={item}
                             />
