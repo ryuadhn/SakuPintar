@@ -4,6 +4,7 @@ node_modules/
 # Production builds
 dist/
 build/
+.vite/
 
 # Local environment variables (Supabase keys)
 .env
