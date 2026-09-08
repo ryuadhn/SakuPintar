@@ -5,8 +5,85 @@ const USERS_KEY = 'sakupintar_users';
 const SESSION_KEY = 'sakupintar_session';
 const DEMO_EMAIL = 'demo@sakupintar.id';
 const DEMO_PASS = 'demo123';
+const OAUTH_CALLBACK_KEYS = [
+    'access_token',
+    'refresh_token',
+    'expires_in',
+    'expires_at',
+    'token_type',
+    'provider_token',
+    'provider_refresh_token',
+    'type',
+    'code',
+    'sb_flow_id',
+    'error',
+    'error_code',
+    'error_description'
+];
 
 const hashPass = (s) => btoa(unescape(encodeURIComponent(`sp::${s}`))).split('').reverse().join('');
+
+const toAppUser = (session) => {
+    const sessionUser = session?.user;
+    if (!sessionUser) return null;
+
+    return {
+        id: sessionUser.id,
+        name: sessionUser.user_metadata?.name || 'Pengguna',
+        email: sessionUser.email
+    };
+};
+
+export function hasOAuthCallbackParams() {
+    if (typeof window === 'undefined') return false;
+
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const searchParams = new URLSearchParams(window.location.search);
+    return ['access_token', 'refresh_token', 'code', 'error', 'error_code', 'error_description']
+        .some((key) => hashParams.has(key) || searchParams.has(key));
+}
+
+const getOAuthCallbackError = () => {
+    if (typeof window === 'undefined') return '';
+
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const searchParams = new URLSearchParams(window.location.search);
+    const getParam = (key) => searchParams.get(key) || hashParams.get(key) || '';
+    const error = getParam('error');
+    const errorCode = getParam('error_code');
+    const description = getParam('error_description');
+
+    if (!error && !errorCode && !description) return '';
+    return `Login Google gagal: ${description || error || errorCode}`;
+};
+
+const clearOAuthCallbackParams = () => {
+    if (typeof window === 'undefined') return;
+
+    const url = new URL(window.location.href);
+    const searchParams = url.searchParams;
+    const hashParams = new URLSearchParams(url.hash.slice(1));
+    let changed = false;
+
+    if (!hasOAuthCallbackParams()) return;
+
+    OAUTH_CALLBACK_KEYS.forEach((key) => {
+        if (searchParams.has(key)) {
+            searchParams.delete(key);
+            changed = true;
+        }
+        if (hashParams.has(key)) {
+            hashParams.delete(key);
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        url.search = searchParams.toString();
+        url.hash = hashParams.toString() ? `#${hashParams.toString()}` : '';
+        window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+};
 
 const loadUsers = () => {
     try {
@@ -35,52 +112,77 @@ const loadSession = () => {
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [authLoading, setAuthLoading] = useState(true);
+    const [authError, setAuthError] = useState('');
 
     // Sync Auth Session
     useEffect(() => {
         if (!isSupabaseConfigured) {
+            clearOAuthCallbackParams();
             setUser(loadSession());
             setAuthLoading(false);
             return;
         }
 
-        // Get initial Supabase session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session) {
-                setUser({
-                    id: session.user.id,
-                    name: session.user.user_metadata.name || 'Pengguna',
-                    email: session.user.email
-                });
-            } else {
-                setUser(null);
-            }
-            setAuthLoading(false);
-        }).catch((e) => {
-            console.error('Sakuta: gagal membaca sesi dari Supabase.', e);
-            setUser(null);
-            setAuthLoading(false);
+        let mounted = true;
+        let initialSessionReceived = false;
+        let latestSession = null;
+        let resolveInitialSession;
+        const initialSessionPromise = new Promise((resolve) => {
+            resolveInitialSession = resolve;
         });
 
-        // Listen for Supabase auth state changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            if (session) {
-                setUser({
-                    id: session.user.id,
-                    name: session.user.user_metadata.name || 'Pengguna',
-                    email: session.user.email
-                });
-            } else {
-                setUser(null);
+        // Register before reading the session so an OAuth callback cannot be missed.
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            latestSession = session;
+            if (event === 'INITIAL_SESSION' && !initialSessionReceived) {
+                initialSessionReceived = true;
+                resolveInitialSession(session);
             }
+            if (!mounted) return;
+            setUser(toAppUser(session));
+            if (session) setAuthError('');
         });
 
-        return () => subscription.unsubscribe();
+        // Wait for both SDK initialization and its initial state event before routing.
+        const restoreSession = async () => {
+            try {
+                const { error } = await supabase.auth.getSession();
+                if (error) throw error;
+                await initialSessionPromise;
+                if (!mounted) return;
+
+                const session = latestSession;
+                const callbackError = getOAuthCallbackError();
+                clearOAuthCallbackParams();
+                setUser(toAppUser(session));
+                if (callbackError) setAuthError(callbackError);
+                setAuthLoading(false);
+            } catch (e) {
+                if (!mounted) return;
+                await initialSessionPromise;
+                if (!mounted) return;
+                console.error('Sakuta: gagal membaca sesi dari Supabase.', e);
+                const callbackError = getOAuthCallbackError();
+                clearOAuthCallbackParams();
+                setUser(toAppUser(latestSession));
+                setAuthError(callbackError || e?.message || 'Sesi OAuth tidak dapat dipulihkan. Silakan coba lagi.');
+                setAuthLoading(false);
+            }
+        };
+
+        restoreSession();
+
+        return () => {
+            mounted = false;
+            resolveInitialSession(null);
+            subscription.unsubscribe();
+        };
     }, []);
 
     const login = useCallback(async (email, password) => {
         const em = String(email || '').trim().toLowerCase();
         if (!em || !password) return { ok: false, error: 'Email dan kata sandi wajib diisi.' };
+        setAuthError('');
 
         if (!isSupabaseConfigured) {
             const users = loadUsers();
@@ -112,6 +214,7 @@ export function AuthProvider({ children }) {
         const nm = String(name || '').trim();
         const em = String(email || '').trim().toLowerCase();
         if (!nm || !em || !password) return { ok: false, error: 'Semua kolom wajib diisi.' };
+        setAuthError('');
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return { ok: false, error: 'Format email tidak valid.' };
         if (password.length < 8) return { ok: false, error: 'Kata sandi minimal 8 karakter.' };
 
@@ -146,6 +249,7 @@ export function AuthProvider({ children }) {
     }, []);
 
     const loginWithGoogle = useCallback(async () => {
+        setAuthError('');
         if (!isSupabaseConfigured) {
             const session = { name: 'Demo User', email: DEMO_EMAIL, id: 'local-user' };
             localStorage.setItem(SESSION_KEY, JSON.stringify(session));
@@ -185,8 +289,9 @@ export function AuthProvider({ children }) {
         loginWithGoogle,
         logout,
         authLoading,
+        authError,
         demo: { email: DEMO_EMAIL, password: DEMO_PASS },
-    }), [user, login, register, loginWithGoogle, logout, authLoading]);
+    }), [user, login, register, loginWithGoogle, logout, authLoading, authError]);
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

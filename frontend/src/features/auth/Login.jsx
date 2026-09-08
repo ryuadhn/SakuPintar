@@ -6,7 +6,7 @@ import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail } from 'lucide-react';
 
 export default function Login() {
     const navigate = useNavigate();
-    const { user, login, loginWithGoogle, demo } = useAuth();
+    const { user, login, loginWithGoogle, demo, authError } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -18,6 +18,10 @@ export default function Login() {
             navigate('/dashboard', { replace: true });
         }
     }, [user, navigate]);
+
+    useEffect(() => {
+        if (authError) setError(authError);
+    }, [authError]);
 
     const handleGoogleLogin = async () => {
         setError('');

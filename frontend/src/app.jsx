@@ -2,7 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { registerSW } from 'virtual:pwa-register';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider, hasOAuthCallbackParams, useAuth } from './contexts/AuthContext';
 import { FinanceProvider } from './contexts/FinanceContext';
 import './index.css';
 
@@ -23,7 +23,7 @@ registerSW({ immediate: true });
 
 function ProtectedRoute({ children }) {
   const { user, authLoading } = useAuth();
-  if (authLoading) {
+  if (authLoading || hasOAuthCallbackParams()) {
     return (
       <div className="app-shell h-screen w-screen flex justify-center items-center">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#0e6c4a] border-t-transparent"></div>
@@ -36,7 +36,7 @@ function ProtectedRoute({ children }) {
 
 function GuestRoute({ children }) {
   const { user, authLoading } = useAuth();
-  if (authLoading) {
+  if (authLoading || hasOAuthCallbackParams()) {
     return (
       <div className="app-shell h-screen w-screen flex justify-center items-center">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#0e6c4a] border-t-transparent"></div>
@@ -49,7 +49,7 @@ function GuestRoute({ children }) {
 
 function RootRoute() {
   const { user, authLoading } = useAuth();
-  if (authLoading) {
+  if (authLoading || hasOAuthCallbackParams()) {
     return (
       <div className="app-shell h-screen w-screen flex justify-center items-center">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#0e6c4a] border-t-transparent"></div>
