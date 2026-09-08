@@ -5,7 +5,32 @@ import { advanceISO, currentMonthKey, daysAgoISO, dayOfMonthISO, FREQ_LABELS, mo
 
 const STORAGE_KEY = 'sakupintar_finance_v1';
 const RECURRING_METADATA_KEY = 'sakupintar_recurring_metadata_v1';
+const CATEGORY_STORAGE_KEY = 'sakupintar_categories_v1';
 const REMINDER_PRIORITIES = new Set(['low', 'medium', 'high']);
+
+const categoryStorageKey = (userId) => `${CATEGORY_STORAGE_KEY}_${userId}`;
+
+const readStoredCategories = (userId) => {
+    if (!userId) return null;
+    try {
+        const raw = localStorage.getItem(categoryStorageKey(userId));
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : null;
+    } catch (error) {
+        console.warn('Sakuta: gagal membaca kategori tersimpan.', error);
+        return null;
+    }
+};
+
+const writeStoredCategories = (userId, categories) => {
+    if (!userId) return;
+    try {
+        localStorage.setItem(categoryStorageKey(userId), JSON.stringify(categories));
+    } catch (error) {
+        console.warn('Sakuta: gagal menyimpan kategori.', error);
+    }
+};
 
 const normalizeReminderPriority = (priority) => (
     REMINDER_PRIORITIES.has(priority) ? priority : null
@@ -417,6 +442,7 @@ export function FinanceProvider({ children }) {
                 const rulesData = rulesResponse.data;
                 const remindersData = remindersResponse.data;
                 const invsData = invitationsResponse.data;
+                const storedCategories = readStoredCategories(userId);
 
                 const budgetsObj = {};
                 if (budgetsData) {
@@ -429,7 +455,7 @@ export function FinanceProvider({ children }) {
                     wallets: walletsData && walletsData.length > 0
                         ? walletsData.map(w => ({ id: w.id, name: w.name, color: w.color, initialBalance: Number(w.balance) }))
                         : seedWallets.map(w => ({ ...w })),
-                    categories: seedCategories.map(c => ({ ...c })),
+                    categories: storedCategories ?? seedCategories.map(c => ({ ...c })),
                     transactions: txnsData ? txnsData.map(t => ({
                         id: t.id,
                         title: t.title,
@@ -537,10 +563,13 @@ export function FinanceProvider({ children }) {
 
     const addTransaction = useCallback(async (data) => {
         const newId = uid();
-        setState((s) => ({ ...s, transactions: [{ ...data, id: newId }, ...s.transactions] }));
-        
-        if (isSupabaseConfigured && user) {
-            await supabase.from('transactions').insert([{
+        const transaction = { ...data, id: newId };
+        setState((s) => ({ ...s, transactions: [transaction, ...s.transactions] }));
+
+        if (!isSupabaseConfigured || !user) return true;
+
+        try {
+            const { error } = await supabase.from('transactions').insert([{
                 id: newId,
                 user_id: user.id,
                 title: data.title,
@@ -552,14 +581,25 @@ export function FinanceProvider({ children }) {
                 time: data.time,
                 note: data.note
             }]);
+            if (error) throw error;
+            return true;
+        } catch (error) {
+            console.error('Sakuta: gagal menyimpan transaksi.', error);
+            setState((s) => ({ ...s, transactions: s.transactions.filter((t) => t.id !== newId) }));
+            setSyncError('Transaksi gagal disimpan. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
+            return false;
         }
     }, [user]);
 
     const updateTransaction = useCallback(async (id, data) => {
+        const previousTransaction = transactions.find((transaction) => transaction.id === id);
+        if (!previousTransaction) return false;
         setState((s) => ({ ...s, transactions: s.transactions.map((t) => (t.id === id ? { ...t, ...data } : t)) }));
-        
-        if (isSupabaseConfigured && user) {
-            await supabase.from('transactions').update({
+
+        if (!isSupabaseConfigured || !user) return true;
+
+        try {
+            const { data: updatedTransactions, error } = await supabase.from('transactions').update({
                 title: data.title,
                 amount: data.amount ? Number(data.amount) : undefined,
                 type: data.type,
@@ -570,17 +610,46 @@ export function FinanceProvider({ children }) {
                 date: data.date,
                 time: data.time,
                 note: data.note
-            }).eq('id', id);
+            }).eq('id', id).eq('user_id', user.id).select('id');
+            if (error) throw error;
+            if (!updatedTransactions || updatedTransactions.length === 0) throw new Error('Transaksi tidak ditemukan atau tidak dapat diakses.');
+            return true;
+        } catch (error) {
+            console.error('Sakuta: gagal memperbarui transaksi.', error);
+            setState((s) => ({
+                ...s,
+                transactions: s.transactions.map((transaction) => (
+                    transaction.id === id ? previousTransaction : transaction
+                )),
+            }));
+            setSyncError('Transaksi gagal diperbarui. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
+            return false;
         }
-    }, [user]);
+    }, [user, transactions]);
 
     const deleteTransaction = useCallback(async (id) => {
+        const previousTransaction = transactions.find((transaction) => transaction.id === id);
+        if (!previousTransaction) return false;
         setState((s) => ({ ...s, transactions: s.transactions.filter((t) => t.id !== id) }));
-        
-        if (isSupabaseConfigured && user) {
-            await supabase.from('transactions').delete().eq('id', id);
+
+        if (!isSupabaseConfigured || !user) return true;
+
+        try {
+            const { data: deletedTransactions, error } = await supabase.from('transactions')
+                .delete()
+                .eq('id', id)
+                .eq('user_id', user.id)
+                .select('id');
+            if (error) throw error;
+            if (!deletedTransactions || deletedTransactions.length === 0) throw new Error('Transaksi tidak ditemukan atau tidak dapat diakses.');
+            return true;
+        } catch (error) {
+            console.error('Sakuta: gagal menghapus transaksi.', error);
+            setState((s) => ({ ...s, transactions: [...s.transactions, previousTransaction] }));
+            setSyncError('Transaksi gagal dihapus. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
+            return false;
         }
-    }, [user]);
+    }, [user, transactions]);
 
     const addTransfer = useCallback(async ({ fromWalletId, toWalletId, amount, title, date, time, note }) => {
         const newId = uid();
@@ -596,9 +665,11 @@ export function FinanceProvider({ children }) {
             time,
         };
         setState((s) => ({ ...s, transactions: [newTx, ...s.transactions] }));
-        
-        if (isSupabaseConfigured && user) {
-            await supabase.from('transactions').insert([{
+
+        if (!isSupabaseConfigured || !user) return true;
+
+        try {
+            const { error } = await supabase.from('transactions').insert([{
                 id: newId,
                 user_id: user.id,
                 type: 'transfer',
@@ -610,6 +681,13 @@ export function FinanceProvider({ children }) {
                 date,
                 time,
             }]);
+            if (error) throw error;
+            return true;
+        } catch (error) {
+            console.error('Sakuta: gagal menyimpan transfer.', error);
+            setState((s) => ({ ...s, transactions: s.transactions.filter((transaction) => transaction.id !== newId) }));
+            setSyncError('Transfer gagal disimpan. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
+            return false;
         }
     }, [user]);
 
@@ -622,19 +700,30 @@ export function FinanceProvider({ children }) {
             initialBalance: Number(initialBalance) || 0,
         };
         setState((s) => ({ ...s, wallets: [...s.wallets, wallet] }));
-        
-        if (isSupabaseConfigured && user) {
-            await supabase.from('wallets').insert([{
+
+        if (!isSupabaseConfigured || !user) return true;
+
+        try {
+            const { error } = await supabase.from('wallets').insert([{
                 id: newId,
                 user_id: user.id,
                 name: wallet.name,
                 color: wallet.color,
                 balance: wallet.initialBalance
             }]);
+            if (error) throw error;
+            return true;
+        } catch (error) {
+            console.error('Sakuta: gagal menyimpan dompet.', error);
+            setState((s) => ({ ...s, wallets: s.wallets.filter((item) => item.id !== newId) }));
+            setSyncError('Dompet gagal disimpan. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
+            return false;
         }
     }, [user]);
 
     const updateWallet = useCallback(async (id, data) => {
+        const previousWallet = wallets.find((wallet) => wallet.id === id);
+        if (!previousWallet) return false;
         setState((s) => ({
             ...s,
             wallets: s.wallets.map((w) => (
@@ -648,28 +737,57 @@ export function FinanceProvider({ children }) {
                     : w
             )),
         }));
-        
-        if (isSupabaseConfigured && user) {
-            await supabase.from('wallets').update({
+
+        if (!isSupabaseConfigured || !user) return true;
+
+        try {
+            const { data: updatedWallets, error } = await supabase.from('wallets').update({
                 name: data.name?.trim(),
                 color: data.color,
                 balance: data.initialBalance ? Number(data.initialBalance) : undefined
-            }).eq('id', id);
+            }).eq('id', id).eq('user_id', user.id).select('id');
+            if (error) throw error;
+            if (!updatedWallets || updatedWallets.length === 0) throw new Error('Dompet tidak ditemukan atau tidak dapat diakses.');
+            return true;
+        } catch (error) {
+            console.error('Sakuta: gagal memperbarui dompet.', error);
+            setState((s) => ({
+                ...s,
+                wallets: s.wallets.map((wallet) => wallet.id === id ? previousWallet : wallet),
+            }));
+            setSyncError('Dompet gagal diperbarui. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
+            return false;
         }
-    }, [user]);
+    }, [user, wallets]);
 
     const deleteWallet = useCallback(async (id) => {
+        const previousWallet = wallets.find((wallet) => wallet.id === id);
+        if (!previousWallet) return false;
         setState((s) => ({
             ...s,
             wallets: s.wallets.filter((w) => w.id !== id),
         }));
-        
-        if (isSupabaseConfigured && user) {
-            await supabase.from('wallets').delete().eq('id', id);
-        }
-    }, [user]);
 
-    const addCategory = useCallback(({ name, type, budget }) => {
+        if (!isSupabaseConfigured || !user) return true;
+
+        try {
+            const { data: deletedWallets, error } = await supabase.from('wallets')
+                .delete()
+                .eq('id', id)
+                .eq('user_id', user.id)
+                .select('id');
+            if (error) throw error;
+            if (!deletedWallets || deletedWallets.length === 0) throw new Error('Dompet tidak ditemukan atau tidak dapat diakses.');
+            return true;
+        } catch (error) {
+            console.error('Sakuta: gagal menghapus dompet.', error);
+            setState((s) => ({ ...s, wallets: [...s.wallets, previousWallet] }));
+            setSyncError('Dompet gagal dihapus. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
+            return false;
+        }
+    }, [user, wallets]);
+
+    const addCategory = useCallback(({ name, type, iconKey, budget }) => {
         const palette = ['#B45309', '#2563EB', '#9333EA', '#E11D48', '#059669', '#0F766E', '#475569'];
         const badgePalette = [
             'bg-amber-50 text-amber-700 border border-amber-100',
@@ -681,15 +799,31 @@ export function FinanceProvider({ children }) {
             'bg-slate-100 text-slate-700 border border-slate-200',
         ];
         const idx = Math.floor(Math.random() * palette.length);
-        const cat = { id: uid(), name, type: type || 'expense', color: palette[idx], badge: badgePalette[idx] };
+        const categoryType = type || 'expense';
+        const cat = {
+            id: uid(),
+            name,
+            type: categoryType,
+            iconKey: iconKey || (categoryType === 'income' ? 'income' : 'wallet'),
+            color: palette[idx],
+            badge: badgePalette[idx],
+        };
+        const nextCategories = [...categories, cat];
+        if (isSupabaseConfigured && user) writeStoredCategories(user.id, nextCategories);
         setState((s) => ({
             ...s,
             categories: [...s.categories, cat],
             budgets: budget && cat.type === 'expense' ? { ...s.budgets, [cat.id]: Number(budget) } : s.budgets,
         }));
-    }, []);
+    }, [user, categories]);
 
     const updateCategory = useCallback((id, data) => {
+        const nextCategories = categories.map((category) => (category.id === id ? {
+            ...category,
+            name: data.name ?? category.name,
+            iconKey: data.iconKey ?? category.iconKey,
+        } : category));
+        if (isSupabaseConfigured && user) writeStoredCategories(user.id, nextCategories);
         setState((s) => {
             const budgetsNext = { ...s.budgets };
             if (data.budget === null || data.budget === '' || data.budget === undefined) delete budgetsNext[id];
@@ -697,25 +831,28 @@ export function FinanceProvider({ children }) {
             return {
                 ...s,
                 budgets: budgetsNext,
-                categories: s.categories.map((c) => (c.id === id ? { ...c, name: data.name ?? c.name } : c)),
+                categories: nextCategories,
             };
         });
-    }, []);
+    }, [user, categories]);
 
     const deleteCategory = useCallback((id) => {
+        const nextCategories = categories.filter((category) => category.id !== id);
+        if (isSupabaseConfigured && user) writeStoredCategories(user.id, nextCategories);
         setState((s) => {
             const budgetsNext = { ...s.budgets };
             delete budgetsNext[id];
             return {
                 ...s,
                 budgets: budgetsNext,
-                categories: s.categories.filter((c) => c.id !== id),
+                categories: nextCategories,
                 recurringRules: s.recurringRules.filter((r) => r.categoryId !== id),
             };
         });
-    }, []);
+    }, [user, categories]);
 
     const setBudget = useCallback(async (categoryId, limit) => {
+        const previousBudget = budgets[categoryId];
         setState((s) => {
             const budgetsNext = { ...s.budgets };
             if (!limit) delete budgetsNext[categoryId];
@@ -723,19 +860,37 @@ export function FinanceProvider({ children }) {
             return { ...s, budgets: budgetsNext };
         });
 
-        if (isSupabaseConfigured && user) {
+        if (!isSupabaseConfigured || !user) return true;
+
+        try {
             if (!limit) {
-                await supabase.from('category_budgets').delete().eq('user_id', user.id).eq('category_id', categoryId);
+                const { error } = await supabase.from('category_budgets')
+                    .delete()
+                    .eq('user_id', user.id)
+                    .eq('category_id', categoryId);
+                if (error) throw error;
             } else {
-                await supabase.from('category_budgets').upsert([{
+                const { error } = await supabase.from('category_budgets').upsert([{
                     user_id: user.id,
                     category_id: categoryId,
                     limit_amount: Number(limit),
                     month_key: currentMonthKey()
                 }], { onConflict: 'user_id,category_id,month_key' });
+                if (error) throw error;
             }
+            return true;
+        } catch (error) {
+            console.error('Sakuta: gagal menyimpan anggaran kategori.', error);
+            setState((s) => {
+                const budgetsNext = { ...s.budgets };
+                if (previousBudget === undefined) delete budgetsNext[categoryId];
+                else budgetsNext[categoryId] = previousBudget;
+                return { ...s, budgets: budgetsNext };
+            });
+            setSyncError('Anggaran gagal disimpan. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
+            return false;
         }
-    }, [user]);
+    }, [user, budgets]);
 
     const addRecurringRule = useCallback(async (data) => {
         const newId = uid();
@@ -1073,8 +1228,10 @@ export function FinanceProvider({ children }) {
         const goal = { ...data, id: newId, history };
         setState((s) => ({ ...s, savingsGoals: [...s.savingsGoals, goal] }));
 
-        if (isSupabaseConfigured && user) {
-            await supabase.from('savings_goals').insert([{
+        if (!isSupabaseConfigured || !user) return true;
+
+        try {
+            const { error } = await supabase.from('savings_goals').insert([{
                 id: newId,
                 user_id: user.id,
                 title: data.title,
@@ -1083,76 +1240,155 @@ export function FinanceProvider({ children }) {
                 deadline_iso: data.deadlineISO,
                 history: history
             }]);
+            if (error) throw error;
+            return true;
+        } catch (error) {
+            console.error('Sakuta: gagal menyimpan target tabungan.', error);
+            setState((s) => ({ ...s, savingsGoals: s.savingsGoals.filter((item) => item.id !== newId) }));
+            setSyncError('Target tabungan gagal disimpan. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
+            return false;
         }
     }, [user]);
 
     const deleteSavingsGoal = useCallback(async (id) => {
+        const previousGoal = savingsGoals.find((goal) => goal.id === id);
+        if (!previousGoal) return false;
         setState((s) => ({ ...s, savingsGoals: s.savingsGoals.filter((g) => g.id !== id) }));
 
-        if (isSupabaseConfigured && user) {
-            await supabase.from('savings_goals').delete().eq('id', id);
+        if (!isSupabaseConfigured || !user) return true;
+
+        try {
+            const { data: deletedGoals, error } = await supabase.from('savings_goals')
+                .delete()
+                .eq('id', id)
+                .eq('user_id', user.id)
+                .select('id');
+            if (error) throw error;
+            if (!deletedGoals || deletedGoals.length === 0) throw new Error('Target tabungan tidak ditemukan atau tidak dapat diakses.');
+            return true;
+        } catch (error) {
+            console.error('Sakuta: gagal menghapus target tabungan.', error);
+            setState((s) => ({ ...s, savingsGoals: [...s.savingsGoals, previousGoal] }));
+            setSyncError('Target tabungan gagal dihapus. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
+            return false;
         }
-    }, [user]);
+    }, [user, savingsGoals]);
 
     const addSavingsGoalDeposit = useCallback(async (goalId, deposit) => {
-        let goalNext = null;
-        setState((s) => {
-            const goals = s.savingsGoals.map((g) => {
-                if (g.id !== goalId) return g;
-                const newDeposit = { ...deposit, id: uid() };
-                const history = [newDeposit, ...(g.history || [])];
-                const current = g.current + deposit.amount;
-                goalNext = { ...g, current, history };
-                return goalNext;
-            });
-            return { ...s, savingsGoals: goals };
-        });
+        const previousGoal = savingsGoals.find((goal) => goal.id === goalId);
+        if (!previousGoal) return false;
+        const newDeposit = { ...deposit, id: uid() };
+        const goalNext = {
+            ...previousGoal,
+            current: previousGoal.current + deposit.amount,
+            history: [newDeposit, ...(previousGoal.history || [])],
+        };
 
-        if (isSupabaseConfigured && user && goalNext) {
-            await supabase.from('savings_goals').update({
+        setState((s) => ({
+            ...s,
+            savingsGoals: s.savingsGoals.map((goal) => goal.id === goalId ? goalNext : goal),
+        }));
+
+        if (!isSupabaseConfigured || !user) return true;
+
+        try {
+            const { data: updatedGoals, error } = await supabase.from('savings_goals').update({
                 current: goalNext.current,
                 history: goalNext.history
-            }).eq('id', goalId);
+            }).eq('id', goalId).select('id');
+            if (error) throw error;
+            if (!updatedGoals || updatedGoals.length === 0) throw new Error('Target tabungan tidak ditemukan atau tidak dapat diakses.');
+            return true;
+        } catch (error) {
+            console.error('Sakuta: gagal menyimpan setoran target tabungan.', error);
+            setState((s) => ({
+                ...s,
+                savingsGoals: s.savingsGoals.map((goal) => goal.id === goalId ? previousGoal : goal),
+            }));
+            setSyncError('Setoran target tabungan gagal disimpan. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
+            return false;
         }
-    }, [user]);
+    }, [user, savingsGoals]);
 
     const deleteSavingsGoalDeposit = useCallback(async (goalId, depositId) => {
-        let goalNext = null;
-        setState((s) => {
-            const goals = s.savingsGoals.map((g) => {
-                if (g.id !== goalId) return g;
-                const history = (g.history || []).filter((d) => d.id !== depositId);
-                const dep = (g.history || []).find((d) => d.id === depositId);
-                const current = dep ? Math.max(0, g.current - dep.amount) : g.current;
-                goalNext = { ...g, current, history };
-                return goalNext;
-            });
-            return { ...s, savingsGoals: goals };
-        });
+        const previousGoal = savingsGoals.find((goal) => goal.id === goalId);
+        if (!previousGoal) return false;
+        const depositToDelete = (previousGoal.history || []).find((deposit) => deposit.id === depositId);
+        if (!depositToDelete) return false;
+        const goalNext = {
+            ...previousGoal,
+            current: Math.max(0, previousGoal.current - depositToDelete.amount),
+            history: (previousGoal.history || []).filter((deposit) => deposit.id !== depositId),
+        };
 
-        if (isSupabaseConfigured && user && goalNext) {
-            await supabase.from('savings_goals').update({
+        setState((s) => ({
+            ...s,
+            savingsGoals: s.savingsGoals.map((goal) => goal.id === goalId ? goalNext : goal),
+        }));
+
+        if (!isSupabaseConfigured || !user) return true;
+
+        try {
+            const { data: updatedGoals, error } = await supabase.from('savings_goals').update({
                 current: goalNext.current,
                 history: goalNext.history
-            }).eq('id', goalId);
+            }).eq('id', goalId).select('id');
+            if (error) throw error;
+            if (!updatedGoals || updatedGoals.length === 0) throw new Error('Target tabungan tidak ditemukan atau tidak dapat diakses.');
+            return true;
+        } catch (error) {
+            console.error('Sakuta: gagal menghapus setoran target tabungan.', error);
+            setState((s) => ({
+                ...s,
+                savingsGoals: s.savingsGoals.map((goal) => goal.id === goalId ? previousGoal : goal),
+            }));
+            setSyncError('Setoran target tabungan gagal dihapus. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
+            return false;
         }
-    }, [user]);
+    }, [user, savingsGoals]);
 
     const updateSavingsGoalSharing = useCallback(async (goalId, partnerEmail) => {
         const isShared = !!partnerEmail;
-        
+        const previousGoal = savingsGoals.find((goal) => goal.id === goalId);
+        if (!previousGoal) return false;
+
         // If stopping collaboration
         if (!isShared) {
             setState((s) => ({
                 ...s,
                 savingsGoals: s.savingsGoals.map((g) => (g.id === goalId ? { ...g, isShared: false, partnerEmail: null } : g))
             }));
-            
-            if (isSupabaseConfigured && user) {
-                await supabase.from('savings_goals').update({ is_shared: false, partner_email: null }).eq('id', goalId);
-                await supabase.from('savings_goal_invitations').delete().eq('goal_id', goalId);
+
+            if (!isSupabaseConfigured || !user) return true;
+
+            try {
+                const { data: updatedGoals, error: goalError } = await supabase.from('savings_goals')
+                    .update({ is_shared: false, partner_email: null })
+                    .eq('id', goalId)
+                    .eq('user_id', user.id)
+                    .select('id');
+                if (goalError) throw goalError;
+                if (!updatedGoals || updatedGoals.length === 0) throw new Error('Target tabungan tidak ditemukan atau tidak dapat diakses.');
+
+                const { error: invitationError } = await supabase.from('savings_goal_invitations')
+                    .delete()
+                    .eq('goal_id', goalId)
+                    .eq('inviter_email', user.email);
+                if (invitationError) throw invitationError;
+                return true;
+            } catch (error) {
+                console.error('Sakuta: gagal menghentikan kolaborasi target tabungan.', error);
+                setState((s) => ({
+                    ...s,
+                    savingsGoals: s.savingsGoals.map((goal) => goal.id === goalId ? {
+                        ...goal,
+                        isShared: previousGoal?.isShared,
+                        partnerEmail: previousGoal?.partnerEmail,
+                    } : goal),
+                }));
+                setSyncError('Kolaborasi target gagal diperbarui. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
+                return false;
             }
-            return;
         }
 
         // Send an invitation
@@ -1166,13 +1402,15 @@ export function FinanceProvider({ children }) {
             status: 'pending'
         };
 
-        setState(s => ({
+        setState((s) => ({
             ...s,
             invitations: [...(s.invitations || []), newInv]
         }));
 
-        if (isSupabaseConfigured && user) {
-            await supabase.from('savings_goal_invitations').insert([{
+        if (!isSupabaseConfigured || !user) return true;
+
+        try {
+            const { error } = await supabase.from('savings_goal_invitations').insert([{
                 id: newInv.id,
                 goal_id: newInv.goalId,
                 inviter_name: newInv.inviterName,
@@ -1181,69 +1419,106 @@ export function FinanceProvider({ children }) {
                 goal_title: newInv.goalTitle,
                 status: 'pending'
             }]);
+            if (error) throw error;
+            return true;
+        } catch (error) {
+            console.error('Sakuta: gagal mengirim undangan kolaborasi.', error);
+            setState((s) => ({ ...s, invitations: (s.invitations || []).filter((inv) => inv.id !== newInv.id) }));
+            setSyncError('Undangan kolaborasi gagal dikirim. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
+            return false;
         }
     }, [user, savingsGoals]);
 
     const acceptSavingsGoalInvitation = useCallback(async (invitationId) => {
-        let invitation = null;
-        
-        setState(s => {
-            invitation = (s.invitations || []).find(inv => inv.id === invitationId);
-            if (!invitation) return s;
+        const invitation = invitations.find((inv) => inv.id === invitationId);
+        if (!invitation) return false;
+        const alreadyExists = savingsGoals.some((goal) => goal.id === invitation.goalId);
+        const newGoal = {
+            id: invitation.goalId,
+            title: invitation.goalTitle,
+            target: 100000000,
+            current: 25000000,
+            deadlineISO: todayISO(),
+            history: [
+                { id: uid(), date: todayISO(), amount: 25000000, note: 'Saldo Awal Mulai Bersama', senderName: invitation.inviterName }
+            ],
+            isShared: true,
+            partnerEmail: invitation.inviterEmail
+        };
 
-            // Remove/accept the invitation in the local list
-            const invitationsNext = (s.invitations || []).map(inv => 
+        setState((s) => ({
+            ...s,
+            invitations: (s.invitations || []).map((inv) => (
                 inv.id === invitationId ? { ...inv, status: 'accepted' } : inv
-            );
+            )),
+            savingsGoals: alreadyExists ? s.savingsGoals : [...s.savingsGoals, newGoal],
+        }));
 
-            // In local storage, duplicate the shared goal into the invitee's list!
-            const alreadyExists = s.savingsGoals.some(g => g.id === invitation.goalId);
-            if (alreadyExists) return { ...s, invitations: invitationsNext };
+        if (!isSupabaseConfigured || !user) return true;
 
-            // Create a mock local shared goal
-            const newGoal = {
-                id: invitation.goalId,
-                title: invitation.goalTitle,
-                target: 100000000, // mock target values
-                current: 25000000,
-                deadlineISO: todayISO(),
-                history: [
-                    { id: uid(), date: todayISO(), amount: 25000000, note: 'Saldo Awal Mulai Bersama', senderName: invitation.inviterName }
-                ],
-                isShared: true,
-                partnerEmail: invitation.inviterEmail
-            };
+        try {
+            const { data: updatedInvitations, error: invitationUpdateError } = await supabase.from('savings_goal_invitations')
+                .update({ status: 'accepted' })
+                .eq('id', invitationId)
+                .eq('invitee_email', user.email)
+                .select('id');
+            if (invitationUpdateError) throw invitationUpdateError;
+            if (!updatedInvitations || updatedInvitations.length === 0) throw new Error('Undangan kolaborasi tidak ditemukan atau tidak dapat diakses.');
 
-            return {
+            const { data: inv, error: invitationReadError } = await supabase.from('savings_goal_invitations')
+                .select('*')
+                .eq('id', invitationId)
+                .eq('invitee_email', user.email)
+                .single();
+            if (invitationReadError) throw invitationReadError;
+            if (!inv) throw new Error('Undangan kolaborasi tidak ditemukan.');
+
+            const { error: collaboratorError } = await supabase.from('savings_goal_collaborators').insert([{
+                savings_goal_id: inv.goal_id,
+                user_id: user.id
+            }]);
+            if (collaboratorError) throw collaboratorError;
+            return true;
+        } catch (error) {
+            console.error('Sakuta: gagal menerima undangan kolaborasi.', error);
+            setState((s) => ({
                 ...s,
-                invitations: invitationsNext,
-                savingsGoals: [...s.savingsGoals, newGoal]
-            };
-        });
-
-        if (isSupabaseConfigured && user) {
-            await supabase.from('savings_goal_invitations').update({ status: 'accepted' }).eq('id', invitationId);
-            // Insert partner link in collaborators table
-            const { data: inv } = await supabase.from('savings_goal_invitations').select('*').eq('id', invitationId).single();
-            if (inv) {
-                await supabase.from('savings_goal_collaborators').insert([{
-                    savings_goal_id: inv.goal_id,
-                    user_id: user.id
-                }]);
-            }
+                invitations: (s.invitations || []).map((inv) => inv.id === invitationId ? invitation : inv),
+                savingsGoals: alreadyExists
+                    ? s.savingsGoals
+                    : s.savingsGoals.filter((goal) => goal.id !== invitation.goalId),
+            }));
+            setSyncError('Undangan kolaborasi gagal diterima. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
+            return false;
         }
-    }, [user]);
+    }, [user, invitations, savingsGoals]);
 
     const rejectSavingsGoalInvitation = useCallback(async (invitationId) => {
-        setState(s => ({
+        const invitation = invitations.find((inv) => inv.id === invitationId);
+        if (!invitation) return false;
+        setState((s) => ({
             ...s,
             invitations: (s.invitations || []).filter(inv => inv.id !== invitationId)
         }));
 
-        if (isSupabaseConfigured && user) {
-            await supabase.from('savings_goal_invitations').delete().eq('id', invitationId);
+        if (!isSupabaseConfigured || !user) return true;
+
+        try {
+            const { data: deletedInvitations, error } = await supabase.from('savings_goal_invitations')
+                .delete()
+                .eq('id', invitationId)
+                .eq('invitee_email', user.email)
+                .select('id');
+            if (error) throw error;
+            if (!deletedInvitations || deletedInvitations.length === 0) throw new Error('Undangan kolaborasi tidak ditemukan atau tidak dapat diakses.');
+            return true;
+        } catch (error) {
+            console.error('Sakuta: gagal menolak undangan kolaborasi.', error);
+            setState((s) => ({ ...s, invitations: [...(s.invitations || []), invitation] }));
+            setSyncError('Undangan kolaborasi gagal ditolak. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
+            return false;
         }
-    }, [user]);
+    }, [user, invitations]);
 
     const resetData = useCallback(async () => {
         setCalendarError('');
@@ -1269,6 +1544,7 @@ export function FinanceProvider({ children }) {
         }
 
         localStorage.removeItem(STORAGE_KEY);
+        if (user) localStorage.removeItem(categoryStorageKey(user.id));
         setState(seedState());
         return true;
     }, [user]);
