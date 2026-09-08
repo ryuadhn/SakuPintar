@@ -107,7 +107,7 @@ export default function RecurringModal({ isOpen, onClose }) {
                     required
                 />
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <label htmlFor="recurring-type" className="ui-field-label block mb-1.5">Tipe</label>
                         <select id="recurring-type" className={selectClass} value={type} onChange={(e) => { setType(e.target.value); setCategoryId(''); }} disabled={formBusy}>
@@ -136,7 +136,7 @@ export default function RecurringModal({ isOpen, onClose }) {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <label htmlFor="recurring-wallet" className="ui-field-label block mb-1.5">Dompet</label>
                         <select id="recurring-wallet" className={selectClass} value={walletId} onChange={(e) => setWalletId(e.target.value)} disabled={formBusy}>
@@ -166,9 +166,9 @@ export default function RecurringModal({ isOpen, onClose }) {
                     required
                 />
 
-                <div className="flex gap-3 justify-end pt-2">
-                    <Button type="button" variant="secondary" onClick={onClose} disabled={formBusy} className="px-5 py-2.5 disabled:pointer-events-none disabled:opacity-60">Batal</Button>
-                    <Button type="submit" variant="primary" disabled={formBusy} className="px-5 py-2.5 bg-emerald-600 disabled:pointer-events-none disabled:opacity-60">
+                <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+                    <Button type="button" variant="secondary" onClick={onClose} disabled={formBusy} className="w-full px-5 py-2.5 disabled:pointer-events-none disabled:opacity-60 sm:w-auto">Batal</Button>
+                    <Button type="submit" variant="primary" disabled={formBusy} className="w-full bg-emerald-600 px-5 py-2.5 disabled:pointer-events-none disabled:opacity-60 sm:w-auto">
                         {syncLoading ? 'Memuat...' : calendarBusy ? 'Menyimpan...' : 'Simpan Aturan'}
                     </Button>
                 </div>

@@ -93,23 +93,23 @@ export default function Modal({ isOpen, onClose, title, children, wide = false }
                 aria-modal="true"
                 aria-labelledby={titleId}
                 tabIndex="-1"
-                className={`ui-modal bg-white overflow-hidden w-full relative z-10 max-h-[90vh] overflow-y-auto transform transition-all duration-200 animate-in fade-in zoom-in-95 ${wide ? 'max-w-lg' : 'max-w-md'}`}
+                className={`ui-modal ui-modal-shell flex max-h-[90vh] w-full flex-col bg-white relative z-10 overflow-hidden transform transition-all duration-200 animate-in fade-in zoom-in-95 ${wide ? 'max-w-lg' : 'max-w-md'}`}
             >
-                <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
-                    <h2 id={titleId} className="font-semibold text-slate-800 text-base">{title}</h2>
+                <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
+                    <h2 id={titleId} className="min-w-0 flex-1 break-words pr-2 text-base font-semibold text-slate-800">{title}</h2>
                     <button
                         ref={closeButtonRef}
                         type="button"
                         aria-label={`Tutup ${title}`}
                         onClick={onClose}
-                        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"
+                        className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"
                     >
                         <svg aria-hidden="true" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
-                <div className="p-5">
+                <div className="ui-modal-body min-h-0 min-w-0 flex-1 overflow-y-auto p-5">
                     {children}
                 </div>
             </div>

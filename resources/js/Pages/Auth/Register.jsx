@@ -108,11 +108,11 @@ function PasswordField({
         >
           <div className="inline-flex items-start justify-center relative flex-[0_0_auto]">
             {showPassword ? (
-              <svg className="relative w-[22px] h-[15px] stroke-[1.8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg aria-hidden="true" className="relative w-[22px] h-[15px] stroke-[1.8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
               </svg>
             ) : (
-              <svg className="relative w-[22px] h-[15px] stroke-[1.8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg aria-hidden="true" className="relative w-[22px] h-[15px] stroke-[1.8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
@@ -191,24 +191,20 @@ export default function Register() {
         <div className="flex flex-col items-center relative self-stretch w-full flex-[0_0_auto]">
           <div className="inline-flex items-center relative flex-[0_0_auto]">
             {/* Brand Logo */}
-            <div className="flex flex-col w-9 h-[31px] items-start pt-0 pb-4 px-0 relative">
-                <div className="flex w-9 h-[35px] items-center justify-center relative mb-[-20.00px] bg-[#0e6c4a] rounded-lg">
-                <div className="inline-flex flex-col items-center relative flex-[0_0_auto]">
-                  <img
-                    className="relative w-[18px] h-[17px]"
-                    alt="Logo SakuPintar"
-                    src={icon}
-                    draggable={false}
-                  />
-                </div>
-              </div>
+            <div className="flex flex-col w-11 h-11 items-start pt-0 pb-4 px-0 relative">
+              <img
+                className="relative w-11 h-11 rounded-xl"
+                alt="Logo Sakuta"
+                src={icon}
+                draggable={false}
+              />
             </div>
             
             {/* Brand Title */}
             <div className="pl-2 pr-0 py-0 inline-flex flex-col items-start relative flex-[0_0_auto]">
               <div className="inline-flex flex-col items-center relative flex-[0_0_auto]">
                 <div className="relative flex items-center justify-center w-[126px] h-6 mt-[-1.00px] font-semibold text-[#0e6c4a] text-2xl text-center tracking-[-0.60px] leading-[31.2px] whitespace-nowrap">
-                  SakuPintar
+                  Sakuta
                 </div>
               </div>
             </div>
@@ -223,10 +219,8 @@ export default function Register() {
                 </h1>
               </div>
               <div className="flex flex-col max-w-xs items-center relative w-full flex-[0_0_auto]">
-                <p className="relative w-fit font-normal text-[#3f4943] text-sm text-center tracking-[0] leading-5">
-                  Mulai perjalanan finansial cerdas Anda
-                  <br />
-                  sekarang.
+                 <p className="relative w-full font-normal text-center text-sm leading-5 text-[#3f4943] sm:w-fit">
+                  Rencanakan hari ini, capai bersama.
                 </p>
               </div>
             </div>
@@ -234,7 +228,7 @@ export default function Register() {
         </div>
 
         {error && (
-          <div className="ui-auth-error animate-in fade-in duration-300">
+          <div role="alert" className="ui-auth-error animate-in fade-in duration-300">
             {error}
           </div>
         )}
@@ -327,21 +321,6 @@ export default function Register() {
               </span>
             </button>
 
-            {/* Apple OAuth Button */}
-            <button
-              type="button"
-              onClick={handleDemoLogin}
-              title="Masuk cepat dengan akun demo"
-              className="ui-auth-social"
-              aria-label="Continue with Apple"
-            >
-              <svg className="w-5 h-5 fill-zinc-900" viewBox="0 0 24 24">
-                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-1 .04-2.21.67-2.93 1.49-.62.69-1.16 1.84-1.01 2.96 1.12.09 2.27-.57 2.95-1.39z" />
-              </svg>
-              <span className="relative flex items-center justify-center w-fit font-medium text-[#181d1a] text-sm text-center tracking-[0] leading-5 whitespace-nowrap">
-                Apple
-              </span>
-            </button>
           </div>
         </form>
 

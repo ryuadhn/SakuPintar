@@ -5,8 +5,11 @@ import AddTransactionModal from '../Shared/AddTransactionModal';
 import RecurringModal from '../Shared/RecurringModal';
 import WalletModal from '../Shared/WalletModal';
 import BudgetAlertBanner from '../Shared/BudgetAlertBanner';
+import MobileTransactionList from '../Shared/MobileTransactionList';
+import Modal from '../Components/UI/Modal';
 import { useFinance } from '../Store/FinanceContext';
 import { FREQ_LABELS, fmtIDR, formatDateID, todayISO } from '../Utils/format';
+import { Lightbulb } from 'lucide-react';
 
 const RANGE_OPTIONS = ['30 Hari Terakhir', 'Hari Ini', '7 Hari Terakhir', 'Bulan Ini', 'Semua Waktu'];
 
@@ -24,6 +27,7 @@ export default function MultiWallet() {
         deleteTransaction, deleteRecurringRule, toggleRecurringRule,
         deleteWallet,
         getWalletBalance, totalBalance, monthStats,
+        syncLoading, syncError, retrySync,
     } = useFinance();
 
     const [searchParams, setSearchParams] = useSearchParams();
@@ -36,6 +40,7 @@ export default function MultiWallet() {
     const [initialType, setInitialType] = useState('expense');
     const [recurringOpen, setRecurringOpen] = useState(false);
     const [deletingId, setDeletingId] = useState(null);
+    const [deletingRuleId, setDeletingRuleId] = useState(null);
     const [walletModalOpen, setWalletModalOpen] = useState(false);
     const [editingWallet, setEditingWallet] = useState(null);
     const [walletNotice, setWalletNotice] = useState('');
@@ -113,7 +118,7 @@ export default function MultiWallet() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `sakupintar-transaksi-${todayISO()}.csv`;
+        a.download = `sakuta-transaksi-${todayISO()}.csv`;
         a.click();
         URL.revokeObjectURL(url);
     };
@@ -180,7 +185,7 @@ export default function MultiWallet() {
         const cat = categoryById[t.categoryId];
         return (
             <span className={`ui-badge ${cat?.badge || 'bg-stone-100 text-stone-600 border-stone-200'}`}>
-                {cat?.name || 'Tanpa Kategori'}
+                {getCategoryLabel(t)}
             </span>
         );
     };
@@ -209,6 +214,31 @@ export default function MultiWallet() {
     const amountClass = (t) =>
         t.type === 'income' ? 'text-emerald-800' : t.type === 'expense' ? 'text-red-700' : 'text-slate-600';
 
+    const getCategoryLabel = (t) => (
+        t.type === 'transfer' ? 'Transfer' : categoryById[t.categoryId]?.name || 'Tanpa Kategori'
+    );
+
+    const getWalletLabel = (t) => (
+        t.type === 'transfer'
+            ? `${walletById[t.fromWalletId]?.name || '?'} > ${walletById[t.toWalletId]?.name || '?'}`
+            : walletById[t.walletId]?.name || '-'
+    );
+
+    const getAmountLabel = (t) => `${t.type === 'expense' ? '- ' : '+ '}${fmtIDR(t.amount)}`;
+
+    const hasActiveFilters = Boolean(
+        q.trim()
+        || selectedDateRange !== '30 Hari Terakhir'
+        || selectedCategory !== 'Semua Kategori'
+        || selectedType !== 'Semua Jenis'
+    );
+    const emptyTransactionMessage = hasActiveFilters
+        ? 'Tidak ada transaksi yang sesuai filter.'
+        : 'Belum ada transaksi.';
+    const initialSyncLoading = syncLoading && transactions.length === 0;
+    const deletingTransaction = transactions.find((transaction) => transaction.id === deletingId);
+    const deletingRule = recurringRules.find((rule) => rule.id === deletingRuleId);
+
     const pageNumbers = useMemo(() => {
         const nums = [];
         const start = Math.max(1, Math.min(pageSafe - 2, totalPages - 4));
@@ -231,7 +261,7 @@ export default function MultiWallet() {
                             onClick={openTransfer}
                             className="ui-button min-w-0 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 inline-flex items-center justify-center gap-2"
                         >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4" />
                             </svg>
                             Transfer Dompet
@@ -240,7 +270,7 @@ export default function MultiWallet() {
                             onClick={() => setRecurringOpen(true)}
                             className="ui-button min-w-0 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 inline-flex items-center justify-center gap-2"
                         >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
                             Aturan Rutin
@@ -267,6 +297,19 @@ export default function MultiWallet() {
                 </div>
 
                 <BudgetAlertBanner />
+
+                {syncError && (
+                    <div role="alert" className="ui-notice flex flex-col gap-3 border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800 sm:flex-row sm:items-center sm:justify-between">
+                        <span className="min-w-0">Data transaksi tidak dapat dimuat. Periksa koneksi Anda lalu coba lagi.</span>
+                        <button
+                            type="button"
+                            onClick={retrySync}
+                            className="ui-button min-h-[44px] shrink-0 bg-white px-4 py-2 text-rose-800 hover:bg-rose-100 sm:min-h-0"
+                        >
+                            Coba lagi
+                        </button>
+                    </div>
+                )}
 
                 {/* Bento Grid Summary */}
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-4">
@@ -308,21 +351,12 @@ export default function MultiWallet() {
                 </div>
 
                 {/* Wallet Management */}
-                    <div className="ui-card p-4 flex flex-col gap-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="ui-card p-4 flex flex-col gap-3">
+                    <div className="flex flex-col gap-3">
                         <div>
                             <h2 className="ui-section-title">Dompet Saya</h2>
                             <p className="ui-section-description">Tambah, ubah, atau hapus sumber dana yang dipakai transaksi.</p>
                         </div>
-                        <button
-                            onClick={openAddWallet}
-                            className="ui-button"
-                        >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                            </svg>
-                            Tambah Dompet
-                        </button>
                     </div>
 
                     {walletNotice && (
@@ -331,7 +365,7 @@ export default function MultiWallet() {
                         </div>
                     )}
 
-                    <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+                    <div className="wallet-grid grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
                         {walletAlloc.map((wallet) => {
                             const usage = walletUsage[wallet.id] || { transactions: 0, rules: 0 };
                             return (
@@ -355,7 +389,7 @@ export default function MultiWallet() {
                                                 aria-label={`Edit dompet ${wallet.name}`}
                                                 title="Edit dompet"
                                             >
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                 </svg>
                                             </button>
@@ -365,7 +399,7 @@ export default function MultiWallet() {
                                                 aria-label={`Hapus dompet ${wallet.name}`}
                                                 title="Hapus dompet"
                                             >
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                 </svg>
                                             </button>
@@ -384,13 +418,25 @@ export default function MultiWallet() {
                                 </div>
                             );
                         })}
+                        <button
+                            type="button"
+                            onClick={openAddWallet}
+                            className="wallet-add-card group flex min-w-0 flex-col items-center justify-center gap-3 text-center"
+                        >
+                            <span className="wallet-add-card-icon flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 transition-colors duration-150 group-hover:border-emerald-300 group-hover:bg-emerald-100">
+                                <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.25">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+                                </svg>
+                            </span>
+                            <span className="text-sm font-semibold text-emerald-800">Tambah Dompet</span>
+                        </button>
                     </div>
                 </div>
 
                 {/* Filters Section */}
-                <div className="ui-card p-4 flex items-end gap-3 flex-wrap">
-                    <div className="flex-1 min-w-56 flex flex-col gap-[5px]">
-                        <label className="text-neutral-700 text-xs font-normal leading-4 px-1">Cari Transaksi</label>
+                <div className="wallet-filter-card ui-card grid grid-cols-1 gap-3 p-4 sm:flex sm:items-end sm:flex-wrap xl:flex-nowrap">
+                    <div className="wallet-filter-field flex w-full min-w-0 flex-col gap-1.5 sm:min-w-56 sm:flex-1">
+                        <label htmlFor="wallet-transaction-search" className="text-neutral-700 text-xs font-normal leading-4 px-1">Cari Transaksi</label>
                         <div className="relative">
                             <span className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -398,6 +444,7 @@ export default function MultiWallet() {
                                 </svg>
                             </span>
                             <input
+                                id="wallet-transaction-search"
                                 type="search"
                                 value={q}
                                 onChange={(e) => setQ(e.target.value)}
@@ -407,13 +454,14 @@ export default function MultiWallet() {
                         </div>
                     </div>
 
-                    <div className="flex-1 min-w-44 flex flex-col gap-[5px]">
-                        <label className="text-neutral-700 text-xs font-normal leading-4 px-1">Rentang Tanggal</label>
+                    <div className="wallet-filter-field flex w-full min-w-0 flex-col gap-1.5 sm:min-w-44 sm:flex-1">
+                        <label htmlFor="wallet-date-range" className="text-neutral-700 text-xs font-normal leading-4 px-1">Rentang Tanggal</label>
                         <div className="relative">
                             <select
+                                id="wallet-date-range"
                                 value={selectedDateRange}
                                 onChange={(e) => setSelectedDateRange(e.target.value)}
-                                 className="ui-control w-full px-3 pr-8 py-2 appearance-none transition-colors"
+                                  className="ui-control w-full px-3 pr-8 py-2 appearance-none transition-colors"
                             >
                                 {RANGE_OPTIONS.map((o) => <option key={o}>{o}</option>)}
                             </select>
@@ -421,13 +469,14 @@ export default function MultiWallet() {
                         </div>
                     </div>
 
-                    <div className="flex-1 min-w-44 flex flex-col gap-[5px]">
-                        <label className="text-neutral-700 text-xs font-normal leading-4 px-1">Kategori</label>
+                    <div className="wallet-filter-field flex w-full min-w-0 flex-col gap-1.5 sm:min-w-44 sm:flex-1">
+                        <label htmlFor="wallet-category-filter" className="text-neutral-700 text-xs font-normal leading-4 px-1">Kategori</label>
                         <div className="relative">
                             <select
+                                id="wallet-category-filter"
                                 value={selectedCategory}
                                 onChange={(e) => setSelectedCategory(e.target.value)}
-                                className="ui-control w-full px-4 pr-8 py-2.5 appearance-none transition-colors"
+                                 className="ui-control w-full px-3 pr-8 py-2 appearance-none transition-colors"
                             >
                                 <option>Semua Kategori</option>
                                 {categories.map((c) => (
@@ -438,13 +487,14 @@ export default function MultiWallet() {
                         </div>
                     </div>
 
-                    <div className="flex-1 min-w-44 flex flex-col gap-[5px]">
-                        <label className="text-neutral-700 text-xs font-normal leading-4 px-1">Jenis Transaksi</label>
+                    <div className="wallet-filter-field flex w-full min-w-0 flex-col gap-1.5 sm:min-w-44 sm:flex-1">
+                        <label htmlFor="wallet-type-filter" className="text-neutral-700 text-xs font-normal leading-4 px-1">Jenis Transaksi</label>
                         <div className="relative">
                             <select
+                                id="wallet-type-filter"
                                 value={selectedType}
                                 onChange={(e) => setSelectedType(e.target.value)}
-                                className="ui-control w-full px-4 pr-8 py-2.5 appearance-none transition-colors"
+                                 className="ui-control w-full px-3 pr-8 py-2 appearance-none transition-colors"
                             >
                                 <option>Semua Jenis</option>
                                 <option>Pemasukan</option>
@@ -455,22 +505,26 @@ export default function MultiWallet() {
                         </div>
                     </div>
 
-                    <div className="shrink-0 pb-[1px]">
+                    <div className="wallet-filter-action w-full shrink-0 sm:w-auto">
                         <button
+                            type="button"
                             onClick={resetFilters}
-                                 className="px-2 py-2 bg-neutral-200 hover:bg-neutral-300 transition-colors rounded-lg outline outline-1 outline-offset-[-1px] outline-stone-300 flex items-center justify-center active:scale-[0.95]"
+                            disabled={!hasActiveFilters}
+                            className="wallet-reset-filter ui-button ui-button-touch inline-flex w-full items-center justify-center gap-2 border border-slate-200 bg-white px-3 text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 sm:w-auto"
+                            aria-label="Reset filter transaksi"
                             title="Reset Filter"
                         >
-                            <svg width="18" height="12" viewBox="0 0 18 12" fill="none">
+                            <svg aria-hidden="true" width="18" height="12" viewBox="0 0 18 12" fill="none">
                                 <path d="M7 12V10H11V12H7ZM3 7V5H15V7H3ZM0 2V0H18V2H0Z" fill="#3F4943" />
                             </svg>
+                            <span>Reset filter</span>
                         </button>
                     </div>
                 </div>
 
                 {/* Transaction Table Card */}
                 <div className="ui-card p-0 flex flex-col overflow-hidden">
-                    <div className="w-full overflow-x-auto">
+                    <div className="hidden w-full overflow-x-auto sm:block">
                         <table className="w-full min-w-[860px] table-fixed text-left">
                             <thead>
                                 <tr className="bg-white border-b border-stone-300">
@@ -486,7 +540,7 @@ export default function MultiWallet() {
                                 {pageItems.length === 0 && (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-16 text-center text-neutral-500 text-sm">
-                                            Tidak ada transaksi yang cocok dengan filter.
+                                            {initialSyncLoading ? 'Memuat transaksi...' : emptyTransactionMessage}
                                         </td>
                                     </tr>
                                 )}
@@ -518,27 +572,31 @@ export default function MultiWallet() {
 
                                         <td className="px-4 py-3 text-right">
                                             <span className={`text-sm font-semibold leading-5 ${amountClass(t)}`}>
-                                                {t.type === 'expense' ? `- ${fmtIDR(t.amount)}` : `+ ${fmtIDR(t.amount)}`}
+                                                {getAmountLabel(t)}
                                             </span>
                                         </td>
 
                                         <td className="px-3 py-3">
                                             <div className="flex items-center justify-end gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={() => openEdit(t)}
-                                                    className="p-2 rounded-lg hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 transition-colors"
-                                                    title="Edit transaksi"
+                                                 <button
+                                                     type="button"
+                                                     onClick={() => openEdit(t)}
+                                                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-slate-500 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+                                                     aria-label={`Edit transaksi ${t.title}`}
+                                                     title="Edit transaksi"
                                                 >
-                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                     <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                     </svg>
                                                 </button>
-                                                <button
-                                                    onClick={() => setDeletingId(t.id)}
-                                                    className="p-2 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors"
-                                                    title="Hapus transaksi"
+                                                 <button
+                                                     type="button"
+                                                     onClick={() => setDeletingId(t.id)}
+                                                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600"
+                                                     aria-label={`Hapus transaksi ${t.title}`}
+                                                     title="Hapus transaksi"
                                                 >
-                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                     <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                     </svg>
                                                 </button>
@@ -550,53 +608,97 @@ export default function MultiWallet() {
                         </table>
                     </div>
 
+                    <MobileTransactionList
+                        items={pageItems}
+                        loading={initialSyncLoading}
+                        emptyMessage={emptyTransactionMessage}
+                        getCategoryLabel={getCategoryLabel}
+                        getWalletLabel={getWalletLabel}
+                        getAmountLabel={getAmountLabel}
+                        getAmountClass={amountClass}
+                        onEdit={openEdit}
+                        onDelete={(id) => setDeletingId(id)}
+                    />
+
                     {/* Pagination Footer */}
-                    <div className="px-4 py-3 bg-white border-t border-stone-300 flex justify-between items-center flex-wrap gap-3">
-                        <span className="text-neutral-700 text-xs font-normal leading-4">
+                    <div className="flex flex-col gap-3 border-t border-stone-300 bg-white px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                        <span className="hidden text-neutral-700 text-xs font-normal leading-4 sm:inline">
                             Menampilkan {filtered.length === 0 ? 0 : (pageSafe - 1) * PAGE_SIZE + 1} - {Math.min(pageSafe * PAGE_SIZE, filtered.length)} dari {filtered.length} transaksi
                         </span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
                             <button
+                                type="button"
                                 disabled={pageSafe === 1}
                                 onClick={() => setCurrentPage(pageSafe - 1)}
-                                className="w-8 h-8 rounded-lg outline outline-1 outline-offset-[-1px] outline-stone-300 flex items-center justify-center text-[#3F4943] hover:bg-stone-100 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-lg px-2 text-[#3F4943] outline outline-1 outline-offset-[-1px] outline-stone-300 transition-colors hover:bg-stone-100 disabled:pointer-events-none disabled:opacity-30 sm:h-8 sm:min-h-0 sm:w-8 sm:min-w-0 sm:px-0"
+                                aria-label="Halaman sebelumnya"
                             >
                                 <svg width="7" height="10" viewBox="0 0 7 10" fill="none"><path d="M5 10L0 5L5 0L6.16667 1.16667L2.33333 5L6.16667 8.83333L5 10Z" fill="currentColor" /></svg>
+                                <span className="text-xs font-medium sm:hidden">Sebelumnya</span>
                             </button>
-                            {pageNumbers.map((n) => (
-                                <button
-                                    key={n}
-                                    onClick={() => setCurrentPage(n)}
-                                    className={`w-8 h-8 rounded-lg text-sm font-semibold flex items-center justify-center transition-colors ${pageSafe === n ? 'bg-emerald-800 text-white' : 'outline outline-1 outline-offset-[-1px] outline-stone-300 text-neutral-700 hover:bg-stone-100'}`}
-                                >
-                                    {n}
-                                </button>
-                            ))}
+                            <span className="text-center text-xs font-medium leading-4 text-neutral-700 sm:hidden">
+                                {pageSafe} / {totalPages}
+                            </span>
+                            <div className="hidden items-center gap-2 sm:flex">
+                                {pageNumbers.map((n) => (
+                                    <button
+                                        type="button"
+                                        key={n}
+                                        onClick={() => setCurrentPage(n)}
+                                        aria-label={`Buka halaman ${n}`}
+                                        aria-current={pageSafe === n ? 'page' : undefined}
+                                        className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm font-semibold transition-colors ${pageSafe === n ? 'bg-emerald-800 text-white' : 'outline outline-1 outline-offset-[-1px] outline-stone-300 text-neutral-700 hover:bg-stone-100'}`}
+                                    >
+                                        {n}
+                                    </button>
+                                ))}
+                            </div>
                             <button
+                                type="button"
                                 disabled={pageSafe === totalPages}
                                 onClick={() => setCurrentPage(pageSafe + 1)}
-                                className="w-8 h-8 rounded-lg outline outline-1 outline-offset-[-1px] outline-stone-300 flex items-center justify-center text-[#3F4943] hover:bg-stone-100 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-lg px-2 text-[#3F4943] outline outline-1 outline-offset-[-1px] outline-stone-300 transition-colors hover:bg-stone-100 disabled:pointer-events-none disabled:opacity-30 sm:h-8 sm:min-h-0 sm:w-8 sm:min-w-0 sm:px-0"
+                                aria-label="Halaman berikutnya"
                             >
                                 <svg width="7" height="10" viewBox="0 0 7 10" fill="none"><path d="M3.83333 5L0 1.16667L1.16667 0L6.16667 5L1.16667 10L0 8.83333L3.83333 5Z" fill="currentColor" /></svg>
+                                <span className="text-xs font-medium sm:hidden">Berikutnya</span>
                             </button>
                         </div>
                     </div>
                 </div>
 
                 {/* Insight + Wallet Allocation */}
-                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="ui-insight-dark min-h-56 flex flex-col justify-end items-start overflow-hidden p-5 relative">
-                        <div className="space-y-2">
-                            <h4 className="text-white text-base font-semibold leading-6">Insight pintar</h4>
-                            <p className="text-white/80 text-base font-normal leading-6 max-w-sm">
-                                Selisih arus kas bulan ini:{' '}
-                                <span className={stats.net >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
-                                    {stats.net >= 0 ? '+' : ''}{fmtIDR(stats.net)}
-                                </span>
-                                . {stats.net >= 0 ? 'Keuangan Anda sehat bulan ini!' : 'Perhatikan pengeluaran Anda.'}
-                            </p>
+                 <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
+                    <section className="ui-insight flex min-w-0 items-start gap-3 p-4 sm:p-5" aria-labelledby="wallet-insight-heading">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800">
+                            <Lightbulb className="h-4 w-4" aria-hidden="true" />
                         </div>
-                    </div>
+                        <div className="min-w-0 space-y-1.5">
+                            <h4 id="wallet-insight-heading" className="ui-section-title">Insight pintar</h4>
+                            {stats.income > 0 || stats.expense > 0 ? (
+                                <>
+                                    <p className="max-w-sm text-sm leading-relaxed text-emerald-950">
+                                        Selisih arus kas bulan ini:{' '}
+                                        <span className={stats.net >= 0 ? 'font-semibold text-emerald-800' : 'font-semibold text-rose-700'}>
+                                            {stats.net >= 0 ? '+' : ''}{fmtIDR(stats.net)}
+                                        </span>
+                                    </p>
+                                    <p className="text-xs leading-relaxed text-emerald-900/75">
+                                        {stats.net >= 0 ? 'Keuangan Anda sehat bulan ini!' : 'Perhatikan pengeluaran Anda.'}
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-sm font-medium leading-relaxed text-emerald-950">
+                                        Belum cukup data untuk membuat insight bulan ini.
+                                    </p>
+                                    <p className="text-xs leading-relaxed text-emerald-900/75">
+                                        Catat beberapa transaksi untuk melihat pola keuangan Anda.
+                                    </p>
+                                </>
+                            )}
+                        </div>
+                    </section>
 
                     <div className="ui-card p-5 flex flex-col gap-3">
                         <div className="flex justify-between items-center">
@@ -662,19 +764,27 @@ export default function MultiWallet() {
 
                                     <div className="flex items-center justify-between pt-1 border-t border-stone-200/70">
                                         <button
+                                            type="button"
                                             onClick={() => toggleRecurringRule(rule.id)}
-                                            className={`relative w-10 h-5 rounded-full transition-colors ${rule.active ? 'bg-emerald-700' : 'bg-stone-300'}`}
+                                             className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+                                            role="switch"
+                                            aria-checked={rule.active}
+                                            aria-label={`${rule.active ? 'Nonaktifkan' : 'Aktifkan'} aturan ${rule.title}`}
                                             title={rule.active ? 'Nonaktifkan' : 'Aktifkan'}
                                         >
-                                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${rule.active ? 'left-[22px]' : 'left-0.5'}`} />
+                                            <span aria-hidden="true" className={`relative block h-5 w-10 rounded-full transition-colors ${rule.active ? 'bg-emerald-700' : 'bg-stone-300'}`}>
+                                                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${rule.active ? 'left-[22px]' : 'left-0.5'}`} />
+                                            </span>
                                         </button>
                                         <div className="flex gap-1">
                                             <button
-                                                onClick={() => { deleteRecurringRule(rule.id); }}
-                                                className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
+                                                type="button"
+                                                onClick={() => setDeletingRuleId(rule.id)}
+                                                className="ui-icon-button ui-icon-button-danger"
+                                                aria-label={`Hapus aturan ${rule.title}`}
                                                 title="Hapus aturan"
                                             >
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                 <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                 </svg>
                                             </button>
@@ -688,37 +798,88 @@ export default function MultiWallet() {
 
             </div>
 
-            {/* Delete confirmation */}
-            {deletingId && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setDeletingId(null)} />
-                      <div className="ui-modal bg-white p-5 max-w-sm w-full relative z-10">
-                         <h3 className="font-semibold text-slate-800 text-lg">Hapus Transaksi?</h3>
-                        <p className="text-sm text-slate-500 mt-1.5">Transaksi yang dihapus tidak dapat dikembalikan.</p>
-                         <div className="flex gap-3 justify-end mt-4">
+            {/* Modals */}
+            <Modal
+                isOpen={Boolean(deletingId)}
+                onClose={() => setDeletingId(null)}
+                title="Hapus transaksi"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm leading-6 text-slate-600">
+                        {deletingTransaction ? (
+                            <>Hapus transaksi <strong className="text-slate-800">&quot;{deletingTransaction.title}&quot;</strong>? Transaksi yang dihapus tidak dapat dikembalikan.</>
+                        ) : (
+                            'Transaksi yang dihapus tidak dapat dikembalikan.'
+                        )}
+                    </p>
+                    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                             <button
+                                type="button"
                                 onClick={() => setDeletingId(null)}
-                                className="ui-button bg-emerald-50 hover:bg-emerald-100 text-emerald-700"
-                            >
-                                Batal
-                            </button>
-                            <button
-                                onClick={() => { deleteTransaction(deletingId); setDeletingId(null); }}
-                                className="ui-button bg-red-600 hover:bg-red-700 text-white"
-                            >
-                                Hapus
-                            </button>
-                        </div>
+                            className="ui-button min-h-[44px] w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 sm:w-auto"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (deletingId) deleteTransaction(deletingId);
+                                setDeletingId(null);
+                            }}
+                            className="ui-button min-h-[44px] w-full bg-red-600 text-white hover:bg-red-700 sm:w-auto"
+                        >
+                            Hapus transaksi
+                        </button>
                     </div>
                 </div>
-            )}
-
-            {/* Modals */}
+            </Modal>
+            <Modal
+                isOpen={Boolean(deletingRuleId)}
+                onClose={() => setDeletingRuleId(null)}
+                title="Hapus aturan rutin"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm leading-6 text-slate-600">
+                        {deletingRule ? (
+                            <>Hapus aturan rutin <strong className="text-slate-800">&quot;{deletingRule.title}&quot;</strong>? Aturan ini tidak akan membuat transaksi otomatis lagi.</>
+                        ) : (
+                            'Aturan rutin ini tidak akan membuat transaksi otomatis lagi.'
+                        )}
+                    </p>
+                    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button
+                            type="button"
+                            onClick={() => setDeletingRuleId(null)}
+                            className="ui-button min-h-[44px] w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 sm:w-auto"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (deletingRuleId) deleteRecurringRule(deletingRuleId);
+                                setDeletingRuleId(null);
+                            }}
+                            className="ui-button min-h-[44px] w-full bg-red-600 text-white hover:bg-red-700 sm:w-auto"
+                        >
+                            Hapus aturan
+                        </button>
+                    </div>
+                </div>
+            </Modal>
             <AddTransactionModal
                 isOpen={modalOpen}
-                onClose={() => setModalOpen(false)}
+                onClose={() => {
+                    setModalOpen(false);
+                    setEditingTxn(null);
+                }}
                 editing={editingTxn}
                 initialType={initialType}
+                onRequestDelete={(transaction) => {
+                    setModalOpen(false);
+                    setEditingTxn(null);
+                    setDeletingId(transaction.id);
+                }}
             />
             <RecurringModal isOpen={recurringOpen} onClose={() => setRecurringOpen(false)} />
             <WalletModal

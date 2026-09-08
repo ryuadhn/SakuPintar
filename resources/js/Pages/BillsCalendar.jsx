@@ -41,6 +41,7 @@ const REMINDER_META = {
         label: 'Reminder keuangan',
         icon: Bell,
         chip: 'bg-amber-50 text-amber-800 border-amber-200',
+        dotClass: 'bg-amber-500',
         card: 'border-amber-200 bg-amber-50/30',
         iconBox: 'bg-amber-50 text-amber-800 border-amber-200',
     },
@@ -48,6 +49,7 @@ const REMINDER_META = {
         label: 'Tugas',
         icon: ListChecks,
         chip: 'bg-slate-50 text-slate-700 border-slate-200',
+        dotClass: 'bg-slate-500',
         card: 'border-slate-200 bg-slate-50/40',
         iconBox: 'bg-slate-100 text-slate-700 border-slate-200',
     },
@@ -55,6 +57,7 @@ const REMINDER_META = {
         label: 'Jadwal',
         icon: CalendarClock,
         chip: 'bg-sky-50 text-sky-800 border-sky-200',
+        dotClass: 'bg-sky-500',
         card: 'border-sky-200 bg-sky-50/20',
         iconBox: 'bg-sky-50 text-sky-800 border-sky-200',
     },
@@ -62,6 +65,7 @@ const REMINDER_META = {
         label: 'Lainnya',
         icon: CircleDot,
         chip: 'bg-stone-50 text-stone-700 border-stone-200',
+        dotClass: 'bg-stone-500',
         card: 'border-stone-200 bg-stone-50/50',
         iconBox: 'bg-stone-100 text-stone-700 border-stone-200',
     },
@@ -369,7 +373,7 @@ export default function BillsCalendar() {
                             type="button"
                             onClick={() => setIsRecurringOpen(true)}
                             disabled={calendarActionsDisabled}
-                            className="ui-button inline-flex w-full items-center justify-center gap-2 bg-emerald-800 text-white hover:bg-emerald-700 disabled:pointer-events-none disabled:opacity-60 sm:w-auto"
+                            className="calendar-mobile-touch ui-button inline-flex w-full items-center justify-center gap-2 bg-emerald-800 text-white hover:bg-emerald-700 disabled:pointer-events-none disabled:opacity-60 sm:w-auto"
                         >
                             <Plus className="h-4 w-4" aria-hidden="true" />
                             Tambah tagihan rutin
@@ -378,7 +382,7 @@ export default function BillsCalendar() {
                             type="button"
                             onClick={openAddReminder}
                             disabled={calendarActionsDisabled}
-                            className="ui-button inline-flex w-full items-center justify-center gap-2 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-60 sm:w-auto"
+                            className="calendar-mobile-touch ui-button inline-flex w-full items-center justify-center gap-2 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-60 sm:w-auto"
                         >
                             <Bell className="h-4 w-4 text-slate-500" aria-hidden="true" />
                             Tambah pengingat
@@ -416,31 +420,35 @@ export default function BillsCalendar() {
                     </div>
                 )}
 
+                <div className="sr-only" role="status" aria-live="polite">
+                    {calendarBusy ? 'Menyimpan perubahan kalender...' : ''}
+                </div>
+
                 <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-12">
-                    <section aria-busy={syncLoading} className="ui-card flex flex-col gap-4 p-4 sm:p-5 xl:col-span-8" aria-labelledby="calendar-heading">
-                        <div className="flex items-start justify-between gap-4">
-                            <div>
-                                <span className="text-xs font-medium text-slate-500">Kalender</span>
-                                <h2 id="calendar-heading" className="mt-1 text-base font-semibold leading-snug text-slate-800">
+                    <section aria-busy={syncLoading || calendarBusy} className="calendar-surface ui-card flex flex-col gap-4 p-4 sm:p-5 xl:col-span-8" aria-labelledby="calendar-heading">
+                        <div className="calendar-toolbar flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                                <span className="calendar-eyebrow text-xs font-medium text-slate-500">Kalender</span>
+                                <h2 id="calendar-heading" className="calendar-month-title mt-1 text-base font-semibold leading-snug text-slate-800">
                                     {MONTH_NAMES[currentMonth]} {currentYear}
                                 </h2>
-                                <p className="ui-section-description">
+                                <p className="calendar-month-description ui-section-description">
                                     Pilih tanggal untuk membuka daily brief Anda.
                                 </p>
                             </div>
-                            <div className="flex shrink-0 items-center gap-1.5">
+                            <div className="calendar-month-nav flex w-full shrink-0 items-center gap-2 sm:w-auto sm:gap-1.5">
                                 <button
                                     type="button"
                                     onClick={() => goToMonth(-1)}
                                     aria-label="Bulan sebelumnya"
-                                    className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"
+                                    className="calendar-nav-button calendar-mobile-touch inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"
                                 >
                                     <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                                 </button>
                                 <button
                                     type="button"
                                     onClick={goToToday}
-                                    className="inline-flex min-h-9 items-center rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"
+                                    className="calendar-today-button calendar-mobile-touch inline-flex min-h-9 flex-1 items-center justify-center rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 sm:flex-none"
                                 >
                                     Hari ini
                                 </button>
@@ -448,14 +456,14 @@ export default function BillsCalendar() {
                                     type="button"
                                     onClick={() => goToMonth(1)}
                                     aria-label="Bulan berikutnya"
-                                    className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"
+                                    className="calendar-nav-button calendar-mobile-touch inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"
                                 >
                                     <ChevronRight className="h-4 w-4" aria-hidden="true" />
                                 </button>
                             </div>
                         </div>
 
-                        <div className="flex flex-wrap gap-x-4 gap-y-1.5 border-y border-[#e2e9e3] py-2.5" aria-label="Keterangan jenis agenda">
+                        <div className="calendar-legend flex flex-wrap items-center gap-x-3 gap-y-1.5 border-y border-[#e2e9e3] py-2.5 sm:gap-x-4" aria-label="Keterangan jenis agenda">
                             {LEGEND_ITEMS.map(({ label, dotClass }) => (
                                 <div key={label} className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600">
                                     <span className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`} aria-hidden="true" />
@@ -464,11 +472,11 @@ export default function BillsCalendar() {
                             ))}
                         </div>
 
-                        <div className="overflow-hidden rounded-xl border border-[#e2e9e3]">
-                             <div className="grid grid-cols-7 border-b border-[#e2e9e3] bg-slate-50/80 py-2.5 text-center text-[10px] font-medium text-slate-500">
-                                {WEEKDAYS.map((day) => <span key={day}>{day}</span>)}
-                            </div>
-                            <div className="grid grid-cols-7 auto-rows-[76px] divide-x divide-y divide-[#e2e9e3] bg-white sm:auto-rows-[104px]">
+                        <div className="calendar-frame overflow-hidden border border-[#e2e9e3]">
+                             <div className="calendar-weekdays grid grid-cols-7 border-b border-[#e2e9e3] bg-slate-50/80 py-2.5 text-center text-[10px] font-medium text-slate-500">
+                                 {WEEKDAYS.map((day) => <span key={day}>{day}</span>)}
+                             </div>
+                             <div className="calendar-grid grid auto-rows-[68px] grid-cols-7 divide-x divide-y divide-[#e2e9e3] bg-white sm:auto-rows-[104px]">
                                 {calendarCells.map((cell) => {
                                     if (!cell.dayNumber) {
                                         return <div key={cell.key} className="bg-slate-50/40" aria-hidden="true" />;
@@ -483,6 +491,7 @@ export default function BillsCalendar() {
                                             title: transaction.title,
                                             icon: transaction.type === 'income' ? ArrowUpRight : ArrowDownRight,
                                             chip: 'bg-emerald-50/80 text-emerald-800 border-emerald-200',
+                                            dotClass: 'bg-emerald-600',
                                             isCompleted: false,
                                         })),
                                         ...dayRules.map((rule) => ({
@@ -490,6 +499,7 @@ export default function BillsCalendar() {
                                             title: rule.title,
                                             icon: rule.type === 'income' ? ArrowUpRight : ArrowDownRight,
                                             chip: 'bg-emerald-50/80 text-emerald-800 border-emerald-200',
+                                            dotClass: 'bg-emerald-600',
                                             isCompleted: false,
                                         })),
                                         ...dayReminders.map((reminder) => {
@@ -499,6 +509,7 @@ export default function BillsCalendar() {
                                                 title: reminder.title,
                                                 icon: meta.icon,
                                                 chip: meta.chip,
+                                                dotClass: meta.dotClass,
                                                 isCompleted: reminder.isCompleted,
                                             };
                                         }),
@@ -508,6 +519,7 @@ export default function BillsCalendar() {
                                         && currentYear === today.getFullYear();
                                     const isSelected = cell.dayNumber === selectedDay;
                                     const visibleEvents = dayEvents.slice(0, 2);
+                                    const eventDots = [...new Set(dayEvents.map((event) => event.dotClass))].slice(0, 3);
                                     const eventCountLabel = dayEvents.length > 0
                                         ? `${dayEvents.length} agenda: ${dayEvents.slice(0, 2).map((event) => event.title).join(', ')}`
                                         : 'Tidak ada agenda';
@@ -521,26 +533,33 @@ export default function BillsCalendar() {
                                              aria-label={dateLabel}
                                              aria-current={isToday ? 'date' : undefined}
                                              aria-pressed={isSelected}
-                                             className={`group flex min-w-0 flex-col items-stretch gap-1 p-1.5 text-left transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-700 sm:p-2 ${
-                                                 isSelected ? 'bg-slate-100/80' : 'hover:bg-slate-50'
-                                             }`}
-                                        >
-                                            <span className={`flex h-6 w-6 items-center justify-center self-start text-xs font-bold ${
-                                                 isToday
-                                                     ? 'rounded-full bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200'
-                                                     : isSelected
-                                                         ? 'font-semibold text-slate-800'
-                                                         : 'text-slate-700'
-                                            }`}>
-                                                {cell.dayNumber}
-                                            </span>
-                                            <span className="flex min-w-0 flex-col gap-1 overflow-hidden">
-                                                {visibleEvents.map((event) => {
+                                             className={`calendar-day-cell group flex min-w-0 flex-col items-stretch gap-1 p-1 text-left transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-700 sm:p-2 ${
+                                                    isSelected ? 'calendar-selected-day bg-slate-100/80' : 'hover:bg-slate-50'
+                                               }`}
+                                          >
+                                              <div className="flex items-center justify-between gap-1">
+                                                  <span className={`calendar-day-number flex h-6 w-6 items-center justify-center self-start text-xs font-bold ${
+                                                      isToday
+                                                          ? 'rounded-full bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200'
+                                                          : isSelected
+                                                              ? 'font-semibold text-slate-800'
+                                                              : 'text-slate-700'
+                                                 }`}>
+                                                     {cell.dayNumber}
+                                                 </span>
+                                                 {eventDots.length > 0 && (
+                                                     <span className="calendar-event-dots flex items-center gap-0.5" aria-hidden="true">
+                                                         {eventDots.map((dotClass) => <span key={dotClass} className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />)}
+                                                     </span>
+                                                 )}
+                                             </div>
+                                              <span className="calendar-day-events flex min-w-0 flex-col gap-1 overflow-hidden">
+                                                 {visibleEvents.map((event, eventIndex) => {
                                                     const EventIcon = event.icon;
                                                     return (
                                                         <span
                                                             key={event.id}
-                                                             className={`inline-flex min-w-0 items-center gap-1 rounded border border-l-2 px-1 py-0.5 text-[10px] font-medium leading-tight ${event.chip} ${event.isCompleted ? 'text-slate-500 line-through opacity-80' : ''}`}
+                                                              className={`calendar-event-chip ${eventIndex > 0 ? 'hidden sm:inline-flex' : ''} inline-flex min-w-0 items-center gap-1 rounded border border-l-2 px-1 py-0.5 text-[11px] font-medium leading-tight sm:text-[10px] ${event.chip} ${event.isCompleted ? 'text-slate-500 line-through opacity-80' : ''}`}
                                                              title={event.title}
                                                              aria-hidden="true"
                                                          >
@@ -549,11 +568,16 @@ export default function BillsCalendar() {
                                                          </span>
                                                      );
                                                  })}
-                                                  {dayEvents.length > 2 && (
-                                                      <span className="truncate pl-1 text-[10px] font-medium text-slate-500">
-                                                         +{dayEvents.length - 2} lainnya
-                                                     </span>
-                                                )}
+                                                    {dayEvents.length > 1 && (
+                                                        <span className="truncate pl-1 text-[10px] font-medium text-slate-500 sm:hidden">
+                                                           +{dayEvents.length - 1} lainnya
+                                                       </span>
+                                                   )}
+                                                   {dayEvents.length > 2 && (
+                                                       <span className="hidden truncate pl-1 text-[10px] font-medium text-slate-500 sm:inline">
+                                                          +{dayEvents.length - 2} lainnya
+                                                       </span>
+                                                   )}
                                             </span>
                                         </button>
                                     );
@@ -561,9 +585,9 @@ export default function BillsCalendar() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-3 border-t border-[#e2e9e3] pt-4 sm:grid-cols-2">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800">
+                         <div className="calendar-summary grid grid-cols-1 gap-3 border-t border-[#e2e9e3] pt-4 sm:grid-cols-2">
+                             <div className="calendar-summary-item flex items-center gap-3">
+                                 <div className="calendar-summary-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800">
                                     <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
                                 </div>
                                 <div>
@@ -571,8 +595,8 @@ export default function BillsCalendar() {
                                     <span className="tabular-nums text-sm font-semibold text-slate-800">{fmtIDR(monthlyStats.totalIncome)}</span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3 border-t border-[#e2e9e3] pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
-                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-800">
+                             <div className="calendar-summary-item flex items-center gap-3 border-t border-[#e2e9e3] pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+                                 <div className="calendar-summary-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-800">
                                     <ArrowDownRight className="h-4 w-4" aria-hidden="true" />
                                 </div>
                                 <div>
@@ -583,10 +607,10 @@ export default function BillsCalendar() {
                         </div>
                     </section>
 
-                    <div className="flex flex-col gap-4 xl:col-span-4">
-                         <section className="ui-card flex flex-col gap-4 p-4 sm:p-5" aria-labelledby="selected-agenda-heading">
+                     <div className="calendar-sidebar flex flex-col gap-4 xl:col-span-4">
+                          <section className="calendar-focus-card ui-card flex flex-col gap-4 p-4 sm:p-5" aria-labelledby="selected-agenda-heading">
                             <div className="flex items-start gap-3">
-                                <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800">
+                                <div className="calendar-focus-date flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800">
                                     <span className="text-lg font-semibold leading-none">{selectedDay}</span>
                                     <span className="mt-1 text-[10px] font-medium">{MONTH_NAMES[currentMonth].slice(0, 3)}</span>
                                 </div>
@@ -604,7 +628,7 @@ export default function BillsCalendar() {
                             </div>
 
                             {selectedAgendaCount === 0 ? (
-                                <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-slate-200 px-4 py-5 text-center">
+                                 <div className="calendar-empty-state flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-slate-200 px-4 py-5 text-center">
                                     <div>
                                          <p className="text-sm font-semibold text-slate-700">Tidak ada agenda pada tanggal ini.</p>
                                         <p className="mt-1 text-xs leading-relaxed text-slate-500">Tambahkan pengingat jika ada hal yang perlu Anda ingat.</p>
@@ -613,7 +637,7 @@ export default function BillsCalendar() {
                                              type="button"
                                              onClick={openAddReminder}
                                              disabled={calendarActionsDisabled}
-                                              className="ui-button-compact inline-flex items-center gap-1.5 text-emerald-800 transition-colors hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
+                                               className="calendar-agenda-touch ui-button-compact inline-flex items-center gap-1.5 text-emerald-800 transition-colors hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
                                     >
                                         <Plus className="h-4 w-4" aria-hidden="true" />
                                         Tambah pengingat
@@ -627,7 +651,7 @@ export default function BillsCalendar() {
                                                 <h3 id="financial-agenda-heading" className="text-xs font-semibold text-slate-700">Aktivitas keuangan</h3>
                                                 <span className="text-xs font-medium text-slate-500">{financialAgenda.length} item</span>
                                             </div>
-                                            <div className="divide-y divide-[#e2e9e3] overflow-hidden rounded-lg border border-[#e2e9e3]">
+                                             <div className="calendar-agenda-list divide-y divide-[#e2e9e3] overflow-hidden rounded-lg border border-[#e2e9e3]">
                                                 {financialAgenda.map((item) => {
                                                     const isIncome = item.type === 'income';
                                                     const isTransfer = item.type === 'transfer';
@@ -668,7 +692,7 @@ export default function BillsCalendar() {
                                                                          type="button"
                                                                          onClick={() => toggleRecurringRule(item.id)}
                                                                          disabled={calendarActionsDisabled}
-                                                                          className="inline-flex min-h-[40px] items-center gap-1 text-xs font-medium text-slate-500 transition-colors hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
+                                                                           className="calendar-agenda-touch inline-flex min-h-[40px] items-center gap-1 text-xs font-medium text-slate-500 transition-colors hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
                                                                     >
                                                                          {item.active ? <ToggleRight className="h-5 w-5 text-emerald-800" aria-hidden="true" /> : <ToggleLeft className="h-5 w-5 text-slate-500" aria-hidden="true" />}
                                                                         {item.active ? 'Aktif' : 'Mati'}
@@ -697,7 +721,7 @@ export default function BillsCalendar() {
                                                 <h3 id="reminder-agenda-heading" className="text-xs font-semibold text-slate-700">Pengingat</h3>
                                                 <span className="text-xs font-medium text-slate-500">{completedReminderCount}/{selectedDayReminders.length} selesai</span>
                                             </div>
-                                            <div className="divide-y divide-[#e2e9e3] overflow-hidden rounded-lg border border-[#e2e9e3]">
+                                             <div className="calendar-agenda-list divide-y divide-[#e2e9e3] overflow-hidden rounded-lg border border-[#e2e9e3]">
                                                 {selectedDayReminders.map((reminder) => {
                                                     const meta = getReminderMeta(reminder.type);
                                                     const ReminderIcon = meta.icon;
@@ -733,7 +757,7 @@ export default function BillsCalendar() {
                                                                      onClick={() => toggleReminder(reminder.id)}
                                                                      disabled={calendarActionsDisabled}
                                                                      aria-pressed={isCompleted}
-                                                                      className={`inline-flex min-h-[40px] items-center gap-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60 ${isCompleted ? 'text-slate-500 hover:text-slate-800' : 'text-amber-800 hover:text-amber-900'}`}
+                                                                      className={`calendar-agenda-touch inline-flex min-h-[40px] items-center gap-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60 ${isCompleted ? 'text-slate-500 hover:text-slate-800' : 'text-amber-800 hover:text-amber-900'}`}
                                                                 >
                                                                     <span className={`flex h-5 w-5 items-center justify-center rounded-md border ${isCompleted ? 'border-emerald-700 bg-emerald-800 text-white' : 'border-amber-300 bg-white text-transparent'}`}>
                                                                         <Check className="h-3.5 w-3.5" aria-hidden="true" />
@@ -771,19 +795,19 @@ export default function BillsCalendar() {
                             )}
                         </section>
 
-                         <section className="ui-card flex flex-col gap-4 p-4 sm:p-5" aria-labelledby="upcoming-heading">
+                          <section className="calendar-side-card ui-card flex flex-col gap-4 p-4 sm:p-5" aria-labelledby="upcoming-heading">
                             <div>
                                 <span className="text-xs font-medium text-slate-500">Fokus berikutnya</span>
                                  <h2 id="upcoming-heading" className="ui-section-title mt-1">Agenda rutin 14 hari ke depan</h2>
                                  <p className="ui-section-description">Pemasukan dan tagihan rutin yang perlu masuk dalam radar Anda.</p>
                             </div>
                             {upcomingBills.length === 0 ? (
-                                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center">
+                                 <div className="calendar-empty-state rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center">
                                      <p className="text-xs font-semibold text-slate-500">Belum ada agenda rutin terdekat.</p>
                                      <p className="mt-1 text-[11px] text-slate-500">Agenda rutin yang aktif akan muncul di sini.</p>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-[#e2e9e3] overflow-y-auto rounded-xl border border-[#e2e9e3]">
+                                 <div className="calendar-agenda-list divide-y divide-[#e2e9e3] overflow-y-auto rounded-xl border border-[#e2e9e3]">
                                     {upcomingBills.map(({ rule, daysRemaining }) => (
                                         <div key={`${rule.id}-${daysRemaining}`} className="flex items-center justify-between gap-3 p-3">
                                             <div className="flex min-w-0 items-center gap-3">
@@ -806,19 +830,19 @@ export default function BillsCalendar() {
                             )}
                          </section>
 
-                         <section className="ui-card flex flex-col gap-4 p-4 sm:p-5" aria-labelledby="recurring-management-heading">
+                          <section className="calendar-side-card ui-card flex flex-col gap-4 p-4 sm:p-5" aria-labelledby="recurring-management-heading">
                             <div>
                                 <span className="text-xs font-medium text-slate-500">Kelola jadwal</span>
                                  <h2 id="recurring-management-heading" className="ui-section-title mt-1">Aturan transaksi rutin</h2>
                                  <p className="ui-section-description">Aktifkan atau nonaktifkan aturan tanpa menghapusnya.</p>
                             </div>
                             {recurringRules.length === 0 ? (
-                                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center">
+                                 <div className="calendar-empty-state rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center">
                                     <p className="text-xs font-semibold text-slate-500">Belum ada aturan rutin.</p>
                                     <p className="mt-1 text-[11px] text-slate-500">Tambahkan aturan untuk mengatur transaksi berulang.</p>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-[#e2e9e3] overflow-hidden rounded-xl border border-[#e2e9e3]">
+                                 <div className="calendar-agenda-list divide-y divide-[#e2e9e3] overflow-hidden rounded-xl border border-[#e2e9e3]">
                                     {recurringRules.map((rule) => (
                                         <div key={rule.id} className={`p-3.5 ${rule.active ? 'bg-white' : 'bg-slate-50/70'}`}>
                                             <div className="flex items-start justify-between gap-3">
@@ -838,7 +862,7 @@ export default function BillsCalendar() {
                                                     onClick={() => toggleRecurringRule(rule.id)}
                                                     disabled={calendarActionsDisabled}
                                                     aria-pressed={rule.active}
-                                                     className="inline-flex min-h-[40px] items-center gap-1.5 text-xs font-medium text-slate-600 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
+                                                     className="calendar-agenda-touch inline-flex min-h-[40px] items-center gap-1.5 text-xs font-medium text-slate-600 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
                                                 >
                                                     {rule.active ? <ToggleRight className="h-5 w-5 text-emerald-800" aria-hidden="true" /> : <ToggleLeft className="h-5 w-5 text-slate-500" aria-hidden="true" />}
                                                     {rule.active ? 'Nonaktifkan' : 'Aktifkan'}

@@ -304,31 +304,31 @@ export default function AIAdvisor() {
 
     return (
         <AuthenticatedLayout>
-            <div className="app-page app-page-chat">
+            <div className="app-page app-page-chat ai-advisor-page">
                 
                 {/* ── Header ── */}
-                <div className="app-page-header">
-                    <div>
+                <div className="app-page-header ai-advisor-header">
+                    <div className="min-w-0">
                         <h1 className="app-page-title">Tanya AI</h1>
                         <p className="app-page-description">Konsultasikan kondisi anggaran, tabungan, dan kelayakan finansial Anda bersama asisten cerdas.</p>
                     </div>
                 </div>
 
                 {/* ── Main Layout ── */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 items-start">
+                <div className="ai-advisor-layout grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 items-start">
                     
                     {/* ── Left Panel: Health Score Summary (4/12) ── */}
-                    <div className="ui-card lg:col-span-4 flex flex-col gap-4 overflow-y-auto">
+                    <div className="ui-card ai-health-panel min-w-0 lg:col-span-4 flex flex-col gap-4 overflow-y-auto">
                         <div>
                             <h3 className="ui-section-title">Skor Kesehatan Finansial</h3>
                             <p className="ui-section-description">Analisis kesehatan finansial berdasarkan pola transaksi riil.</p>
                         </div>
 
                         {/* Score or insufficient-data state */}
-                        <div className="flex flex-col items-center justify-center py-5 border-b border-stone-100 text-center">
+                        <div className="ai-health-score-block flex flex-col items-center justify-center py-5 border-b border-stone-100 text-center">
                             {healthScoreData.isSufficient ? (
-                                <div className="relative w-28 h-28 flex items-center justify-center">
-                                    <svg width="128" height="128" viewBox="0 0 36 36" className="transform -rotate-90" aria-hidden="true">
+                                <div className="ai-health-score relative w-28 h-28 flex items-center justify-center">
+                                    <svg width="128" height="128" viewBox="0 0 36 36" className="ai-health-score-svg transform -rotate-90" aria-hidden="true">
                                         <circle cx="18" cy="18" r="16" fill="transparent" stroke="#E2E8F0" strokeWidth="3" />
                                         <circle
                                             cx="18" cy="18" r="16"
@@ -346,23 +346,23 @@ export default function AIAdvisor() {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="w-28 h-28 rounded-full border-[3px] border-slate-200 flex items-center justify-center">
+                                <div className="ai-health-score ai-health-score-placeholder w-28 h-28 rounded-full border-[3px] border-slate-200 flex items-center justify-center">
                                     <span className="text-slate-500 font-semibold text-3xl leading-8">--</span>
                                 </div>
                             )}
 
-                            <span className={`ui-badge mt-3 ${healthScoreData.colorClass}`}>
+                            <span className={`ai-health-status ui-badge mt-3 ${healthScoreData.colorClass}`}>
                                 {healthScoreData.level}
                             </span>
                             {!healthScoreData.isSufficient && (
-                                <p className="max-w-xs text-xs text-slate-500 leading-relaxed mt-3">
+                                <p className="ai-health-empty-copy max-w-xs text-xs text-slate-500 leading-relaxed mt-3">
                                     Tambahkan transaksi dan anggaran untuk mulai menghitung kondisi finansial Anda.
                                 </p>
                             )}
                         </div>
 
                         {/* Analysis List */}
-                        {healthScoreData.isSufficient && <div className="space-y-3 flex-1">
+                        {healthScoreData.isSufficient && <div className="ai-health-analysis space-y-3 flex-1 min-w-0">
                             {/* Positif factors */}
                             <div className="space-y-2">
                                 <span className="text-xs font-medium text-emerald-800">Faktor positif</span>
@@ -398,19 +398,19 @@ export default function AIAdvisor() {
                         </div>}
 
                         {/* AI Smart Tip Widget */}
-                        <div className="mt-auto pt-4 border-t border-stone-100 flex flex-col gap-2">
+                        <div className="ai-smart-tip mt-auto pt-4 border-t border-stone-100 flex flex-col gap-2 min-w-0">
                             <div className="flex justify-between items-center">
                                 <span className="ui-badge text-emerald-800 bg-emerald-50 border-emerald-100">
                                     Tips Keuangan
                                 </span>
                                 <button 
                                     onClick={() => setCurrentTipIndex((prev) => (prev + 1) % smartTips.length)}
-                                    className="ui-button-compact inline-flex items-center text-slate-500 hover:text-emerald-800 transition-colors"
+                                    className="ai-tip-button ui-button-compact inline-flex items-center text-slate-500 hover:text-emerald-800 transition-colors"
                                 >
                                     Tip Lainnya &rarr;
                                 </button>
                             </div>
-                            <div className="ui-card-subtle p-3">
+                            <div className="ai-tip-card ui-card-subtle p-3 min-w-0">
                                 <h4 className="ui-section-title ui-section-title-compact">{smartTips[currentTipIndex].title}</h4>
                                 <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                                     {smartTips[currentTipIndex].desc}
@@ -421,27 +421,27 @@ export default function AIAdvisor() {
                     </div>
 
                     {/* ── Right Panel: Chat Interface (8/12) ── */}
-                    <div className="ui-card lg:col-span-8 p-0 flex flex-col overflow-hidden h-[500px] lg:h-[520px]">
+                    <div className="ai-chat-workspace ui-card min-w-0 lg:col-span-8 p-0 flex flex-col overflow-hidden sm:h-[500px] lg:h-[520px]">
                         {/* Chat Messages */}
-                        <div className="flex-1 p-4 overflow-y-auto bg-slate-50/50" aria-live="polite">
+                        <div className="ai-chat-messages min-h-0 min-w-0 flex-1 p-4 overflow-y-auto bg-slate-50/50" aria-live="polite">
                             {messages.length === 0 ? (
-                                <div className="h-full flex flex-col items-center justify-center px-5 py-8 text-center">
+                                <div className="ai-chat-welcome h-full min-w-0 flex flex-col items-center justify-center px-5 py-8 text-center">
                                     <h2 className="ui-section-title text-base">Apa yang ingin Anda ketahui tentang keuangan Anda?</h2>
-                                    <p className="max-w-lg text-sm text-slate-500 leading-relaxed mt-2">
-                                        Saya dapat membantu membaca pola pengeluaran, tabungan, anggaran, dan target finansial berdasarkan data SakuPintar Anda.
+                                    <p className="max-w-lg min-w-0 text-sm text-slate-500 leading-relaxed mt-2">
+                                        Saya dapat membantu membaca pola pengeluaran, tabungan, anggaran, dan target finansial berdasarkan data Sakuta Anda.
                                     </p>
                                     {!hasSufficientData && (
-                                        <p className="max-w-lg text-xs text-slate-400 leading-relaxed mt-2">
+                                        <p className="max-w-lg min-w-0 text-xs text-slate-400 leading-relaxed mt-2">
                                             Catat transaksi dan anggaran agar analisis kondisi finansial lebih akurat.
                                         </p>
                                     )}
-                                    <div className="flex flex-wrap justify-center gap-2 max-w-2xl mt-5">
+                                    <div className="ai-prompt-list flex flex-wrap justify-center gap-2 max-w-2xl mt-5 min-w-0">
                                         {quickPrompts.map((p) => (
                                             <button
                                                 key={p.label}
                                                 onClick={() => handleSend(p.text)}
                                                 disabled={isTyping}
-                                                className="ui-button-compact bg-white hover:bg-emerald-50 hover:text-emerald-800 border border-stone-200 hover:border-emerald-300 text-slate-600 inline-flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
+                                                className="ai-prompt ui-button-compact max-w-full bg-white hover:bg-emerald-50 hover:text-emerald-800 border border-stone-200 hover:border-emerald-300 text-slate-600 inline-flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
                                             >
                                                 {p.label}
                                                 <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
@@ -450,17 +450,17 @@ export default function AIAdvisor() {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="space-y-3">
+                                <div className="ai-message-list min-w-0 space-y-3">
                                     {messages.map((msg) => {
                                         const isBot = msg.sender === 'bot';
                                         return (
-                                            <div key={msg.id} className={`flex items-start gap-3 ${isBot ? '' : 'flex-row-reverse'}`}>
+                                            <div key={msg.id} className={`ai-message-row min-w-0 flex items-start gap-3 ${isBot ? '' : 'flex-row-reverse'}`}>
                                                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border shadow-sm ${
                                                     isBot ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-slate-800 border-slate-700 text-white'
                                                 }`}>
                                                     {isBot ? <Bot className="w-4 h-4" aria-hidden="true" /> : <User className="w-4 h-4" aria-hidden="true" />}
                                                 </div>
-                                                <div className={`max-w-[78%] md:max-w-[68%] p-3 rounded-xl text-sm shadow-sm whitespace-pre-line leading-relaxed ${
+                                                <div className={`ai-message-bubble min-w-0 max-w-[78%] md:max-w-[68%] p-3 rounded-xl text-sm shadow-sm whitespace-pre-line leading-relaxed ${
                                                     isBot ? 'bg-white text-slate-800 rounded-tl-sm border border-stone-100' : 'bg-emerald-800 text-white rounded-tr-sm'
                                                 }`}>
                                                     {formatMessageText(msg.text)}
@@ -473,11 +473,11 @@ export default function AIAdvisor() {
                             
                             {/* Typing Indicator */}
                             {isTyping && (
-                                <div className="flex items-start gap-3">
+                                <div className="ai-message-row min-w-0 flex items-start gap-3">
                                     <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border border-emerald-100 bg-emerald-50 text-emerald-800 shadow-sm">
                                         <Bot className="w-4 h-4" aria-hidden="true" />
                                     </div>
-                                    <div className="bg-white border border-stone-100 text-slate-400 p-3 rounded-xl rounded-tl-sm text-sm shadow-sm flex items-center gap-1">
+                                    <div className="ai-typing-bubble bg-white border border-stone-100 text-slate-400 p-3 rounded-xl rounded-tl-sm text-sm shadow-sm flex items-center gap-1">
                                         <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                                         <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                                         <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
@@ -490,13 +490,13 @@ export default function AIAdvisor() {
 
                         {/* Quick Action Suggesters */}
                         {messages.length > 0 && (
-                            <div className="px-4 py-2.5 bg-white border-t border-stone-100 flex flex-wrap gap-2 shrink-0">
+                            <div className="ai-chat-suggestions min-w-0 px-4 py-2.5 bg-white border-t border-stone-100 flex flex-wrap gap-2 shrink-0">
                                 {quickPrompts.map((p) => (
                                     <button
                                         key={p.label}
                                         onClick={() => handleSend(p.text)}
                                         disabled={isTyping}
-                                        className="ui-button-compact bg-slate-50 hover:bg-emerald-50/50 hover:text-emerald-800 border border-stone-200 hover:border-emerald-300 text-slate-600 transition-all inline-flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
+                                        className="ai-prompt ui-button-compact max-w-full bg-slate-50 hover:bg-emerald-50/50 hover:text-emerald-800 border border-stone-200 hover:border-emerald-300 text-slate-600 transition-all inline-flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
                                     >
                                         {p.label}
                                         <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
@@ -508,7 +508,7 @@ export default function AIAdvisor() {
                         {/* Chat Input Bar */}
                         <form 
                             onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-                            className="px-4 py-3 bg-white border-t border-stone-200 flex gap-2 items-center shrink-0"
+                            className="ai-chat-composer min-w-0 px-4 py-3 bg-white border-t border-stone-200 flex gap-2 items-center shrink-0"
                         >
                             <input
                                 type="text"
@@ -517,13 +517,14 @@ export default function AIAdvisor() {
                                 disabled={isTyping}
                                 aria-label="Tulis pertanyaan ke asisten keuangan"
                                 placeholder="Ketik pesan Anda untuk berkonsultasi..."
-                                className="ui-control flex-1 bg-slate-50 px-3 py-2 text-sm disabled:opacity-50"
+                                className="ai-chat-input ui-control min-w-0 flex-1 bg-slate-50 px-3 py-2 text-sm disabled:opacity-50"
                                 required
                             />
                             <button
                                 type="submit"
                                 disabled={isTyping || !input.trim()}
-                                className="ui-button ui-button-icon inline-flex items-center justify-center bg-emerald-800 hover:bg-emerald-700 text-white transition-colors disabled:bg-slate-200 disabled:text-slate-400 shrink-0"
+                                aria-label="Kirim pertanyaan"
+                                className="ai-chat-send ui-button ui-button-icon inline-flex items-center justify-center bg-emerald-800 hover:bg-emerald-700 text-white transition-colors disabled:bg-slate-200 disabled:text-slate-400 shrink-0"
                             >
                                 <Send className="w-4 h-4" aria-hidden="true" />
                             </button>

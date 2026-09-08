@@ -215,8 +215,8 @@ export default function ReminderModal({ isOpen, onClose, editing = null, initial
                 </div>
 
                 <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
-                    <Button type="button" variant="secondary" onClick={onClose} disabled={formBusy} className="min-h-[44px] px-5 py-2.5 disabled:pointer-events-none disabled:opacity-60">Batal</Button>
-                    <Button type="submit" variant="primary" disabled={formBusy} aria-busy={formBusy} className="min-h-[44px] bg-emerald-600 px-5 py-2.5 disabled:pointer-events-none disabled:opacity-60">
+                    <Button type="button" variant="secondary" onClick={onClose} disabled={formBusy} className="min-h-[44px] w-full px-5 py-2.5 disabled:pointer-events-none disabled:opacity-60 sm:w-auto">Batal</Button>
+                    <Button type="submit" variant="primary" disabled={formBusy} aria-busy={formBusy} className="min-h-[44px] w-full bg-emerald-600 px-5 py-2.5 disabled:pointer-events-none disabled:opacity-60 sm:w-auto">
                         {syncLoading ? 'Memuat...' : calendarBusy ? 'Menyimpan...' : saveLabel}
                     </Button>
                 </div>

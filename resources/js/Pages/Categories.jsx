@@ -55,14 +55,14 @@ export default function Categories() {
 
     return (
         <AuthenticatedLayout>
-            <div className="app-page">
+            <div className="app-page categories-page">
                 {/* Header Section */}
-                <div className="app-page-header">
-                    <div>
+                <div className="app-page-header categories-page-header">
+                    <div className="min-w-0">
                         <h1 className="app-page-title">Kategori</h1>
                         <p className="app-page-description">Kelola kategori pengeluaran Anda dan atur batas anggaran bulanan.</p>
                     </div>
-                    <Button variant="primary" onClick={openAdd} className="shrink-0">
+                    <Button variant="primary" onClick={openAdd} className="categories-add-button shrink-0">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                         </svg>
@@ -71,7 +71,7 @@ export default function Categories() {
                 </div>
 
                 {/* Summary strip */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="categories-summary grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="ui-stat-card flex min-w-0 items-center gap-3">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-800">
                             <Wallet className="h-4 w-4" aria-hidden="true" />
@@ -107,7 +107,7 @@ export default function Categories() {
                 <BudgetAlertBanner />
 
                 {/* Categories Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="categories-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {expenseCategories.map((cat) => (
                         <CategoryCard
                             key={cat.id}
@@ -121,12 +121,12 @@ export default function Categories() {
                         />
                     ))}
                     {expenseCategories.length === 0 && (
-                        <div className="ui-empty col-span-full flex flex-col items-center gap-3">
+                        <div className="categories-empty ui-empty col-span-full flex flex-col items-center gap-3">
                             <div>
                                 <p className="font-semibold text-slate-700">Belum ada kategori pengeluaran.</p>
                                 <p className="mt-1 text-xs leading-relaxed text-slate-500">Tambahkan kategori untuk mulai mengatur batas anggaran.</p>
                             </div>
-                            <Button variant="secondary" onClick={openAdd} className="min-h-8 px-3 text-xs">
+                            <Button variant="secondary" onClick={openAdd} className="categories-empty-action min-h-8 px-3 text-xs">
                                 Tambah kategori
                             </Button>
                         </div>
@@ -135,17 +135,17 @@ export default function Categories() {
 
                 {/* Income categories strip */}
                 {incomeCategories.length > 0 && (
-                    <div>
+                    <div className="categories-income-section min-w-0">
                         <h3 className="ui-section-title mb-3 flex items-center gap-2">
                             <Banknote className="w-4 h-4 text-emerald-700" /> Kategori Pemasukan
                         </h3>
-                        <div className="flex flex-wrap gap-3">
+                        <div className="categories-income-list flex flex-wrap gap-3 min-w-0">
                             {incomeCategories.map((cat) => (
                                 <button
                                     key={cat.id}
                                     type="button"
                                     onClick={() => openEdit(cat)}
-                                    className={`ui-badge rounded-full transition-colors ${cat.badge}`}
+                                    className={`categories-income-chip ui-badge rounded-full transition-colors ${cat.badge}`}
                                 >
                                     {cat.name}
                                 </button>

@@ -223,8 +223,9 @@ export default function FinancialPlanner() {
 
                         {/* Title Input */}
                         <div>
-                            <label className="ui-field-label block mb-1.5">Nama target finansial</label>
+                            <label htmlFor="financial-target-title" className="ui-field-label block mb-1.5">Nama target finansial</label>
                             <input
+                                id="financial-target-title"
                                 type="text"
                                 value={targetTitle}
                                 onChange={(e) => setTargetTitle(e.target.value)}
@@ -234,26 +235,29 @@ export default function FinancialPlanner() {
 
                         {/* Target Nominal */}
                         <div>
-                            <label className="ui-field-label block mb-1.5">Target nominal utama (rupiah)</label>
+                            <label htmlFor="financial-target-amount" className="ui-field-label block mb-1.5">Target nominal utama (rupiah)</label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 text-sm font-semibold">Rp</div>
                                 <input
+                                    id="financial-target-amount"
                                     type="text"
                                     value={formatInputValue(targetAmount)}
                                     onChange={(e) => setTargetAmount(parseInputValue(e.target.value))}
+                                    aria-describedby="financial-target-amount-hint"
                                     className="ui-control block w-full pl-10 pr-4 py-2.5 font-semibold"
                                 />
                             </div>
-                            <span className="text-[10px] text-slate-400 mt-1 block">Contoh: 100.000.000 (100 Juta Rupiah)</span>
+                            <span id="financial-target-amount-hint" className="text-[10px] text-slate-400 mt-1 block">Contoh: 100.000.000 (100 Juta Rupiah)</span>
                         </div>
 
                         {/* Jangka Waktu Slider */}
                         <div>
                             <div className="flex justify-between items-center mb-2">
-                                <label className="ui-field-label block">Jangka waktu pencapaian</label>
+                                <label htmlFor="financial-years" className="ui-field-label block">Jangka waktu pencapaian</label>
                                 <span className="text-sm font-semibold text-emerald-800">{years} Tahun</span>
                             </div>
                             <input
+                                id="financial-years"
                                 type="range"
                                 min="1"
                                 max="30"
@@ -270,10 +274,11 @@ export default function FinancialPlanner() {
 
                         {/* Tabungan Awal */}
                         <div>
-                            <label className="ui-field-label block mb-1.5">Modal awal tabungan (rupiah)</label>
+                            <label htmlFor="financial-initial-savings" className="ui-field-label block mb-1.5">Modal awal tabungan (rupiah)</label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 text-sm font-semibold">Rp</div>
                                 <input
+                                    id="financial-initial-savings"
                                     type="text"
                                     value={formatInputValue(initialSavings)}
                                     onChange={(e) => setInitialSavings(parseInputValue(e.target.value))}
@@ -285,9 +290,10 @@ export default function FinancialPlanner() {
                         {/* Two columns: Inflation and Interest Rate */}
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="ui-field-label block mb-1.5">Asumsi inflasi</label>
+                                <label htmlFor="financial-inflation-rate" className="ui-field-label block mb-1.5">Asumsi inflasi</label>
                                 <div className="relative">
                                     <input
+                                        id="financial-inflation-rate"
                                         type="number"
                                         step="0.1"
                                         value={inflationRate}
@@ -298,9 +304,10 @@ export default function FinancialPlanner() {
                                 </div>
                             </div>
                             <div>
-                                <label className="ui-field-label block mb-1.5">Bunga investasi</label>
+                                <label htmlFor="financial-return-rate" className="ui-field-label block mb-1.5">Bunga investasi</label>
                                 <div className="relative">
                                     <input
+                                        id="financial-return-rate"
                                         type="number"
                                         step="0.1"
                                         value={returnRate}

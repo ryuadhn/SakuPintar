@@ -1,4 +1,4 @@
-# 📋 CHANGELOG — SakuPintar
+# 📋 CHANGELOG — Sakuta
 
 > Dokumentasi seluruh pembaruan yang telah diimplementasikan.
 > Terakhir diperbarui: Agustus 2026
@@ -35,7 +35,7 @@
 
 ## 🎯 Ringkasan
 
-SakuPintar berkembang dari UI statis (data hardcoded) menjadi aplikasi pencatat keuangan yang **fungsional penuh**: data tersimpan permanen di browser, transaksi bisa dikelola (tambah/edit/hapus/transfer), ada transaksi rutin otomatis, anggaran bulanan dengan notifikasi, target tabungan yang bisa ditambah sendiri, serta sistem **login & registrasi akun**.
+Sakuta berkembang dari UI statis (data hardcoded) menjadi aplikasi pencatat keuangan yang **fungsional penuh**: data tersimpan permanen di browser, transaksi bisa dikelola (tambah/edit/hapus/transfer), ada transaksi rutin otomatis, anggaran bulanan dengan notifikasi, target tabungan yang bisa ditambah sendiri, serta sistem **login & registrasi akun**.
 
 ---
 

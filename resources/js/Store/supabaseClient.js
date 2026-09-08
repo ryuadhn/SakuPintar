@@ -12,7 +12,7 @@ export const isSupabaseConfigured = !!(
 
 if (!isSupabaseConfigured) {
     console.warn(
-        'SakuPintar: Supabase belum terkonfigurasi. Berjalan dalam mode LocalStorage offline.'
+        'Sakuta: Supabase belum terkonfigurasi. Berjalan dalam mode LocalStorage offline.'
     );
 }
 

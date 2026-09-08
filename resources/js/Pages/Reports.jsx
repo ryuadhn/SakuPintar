@@ -10,6 +10,7 @@ export default function Reports() {
     // ─── State ───
     const [selectedMonth, setSelectedMonth] = useState(currentMonthKey());
     const [hoveredCatId, setHoveredCatId] = useState(null);
+    const [selectedCatId, setSelectedCatId] = useState(null);
 
     // ─── Extract All Available Months for Filter ───
     const availableMonths = useMemo(() => {
@@ -101,12 +102,12 @@ export default function Reports() {
 
     // ─── Hovered Category Detail in Center ───
     const displayedCategory = useMemo(() => {
-        if (hoveredCatId) {
-            return categoryData.find((c) => c.id === hoveredCatId) || null;
+        const activeCatId = hoveredCatId || selectedCatId;
+        if (activeCatId) {
+            return categoryData.find((c) => c.id === activeCatId) || categoryData[0] || null;
         }
-        // Fallback to top category if any
         return categoryData[0] || null;
-    }, [hoveredCatId, categoryData]);
+    }, [hoveredCatId, selectedCatId, categoryData]);
 
     const selectedBudgetAlerts = useMemo(() => categoryData.flatMap((category) => {
         const limit = Number(budgets?.[category.id]) || 0;
@@ -150,7 +151,7 @@ export default function Reports() {
             return [{
                 type: 'neutral',
                 title: 'Belum cukup data untuk analisis',
-                desc: 'Tambahkan beberapa transaksi agar SakuPintar dapat memberikan insight berdasarkan aktivitas keuangan Anda.',
+                desc: 'Tambahkan beberapa transaksi agar Sakuta dapat memberikan insight berdasarkan aktivitas keuangan Anda.',
             }];
         }
 
@@ -240,7 +241,7 @@ export default function Reports() {
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `Laporan_SakuPintar_${selectedMonth}.csv`);
+        link.setAttribute("download", `Laporan_Sakuta_${selectedMonth}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -276,7 +277,7 @@ export default function Reports() {
         printWindow.document.write(`
             <html>
                 <head>
-                    <title>Laporan Keuangan SakuPintar - ${formatMonthYear(selectedMonth + '-01')}</title>
+                    <title>Laporan Keuangan Sakuta - ${formatMonthYear(selectedMonth + '-01')}</title>
                     <style>
                          body { font-family: 'Outfit', 'Inter', sans-serif; color: #18211c; padding: 32px; line-height: 1.5; }
                          h1 { color: #0E6C4A; margin-bottom: 5px; font-weight: 600; font-size: 24px; }
@@ -293,7 +294,7 @@ export default function Reports() {
                 <body>
                     <div class="header">
                         <div>
-                            <h1>SakuPintar</h1>
+                            <h1>Sakuta</h1>
                             <p style="margin: 0; font-size: 13px; color: #64748b;">Laporan Analisis Keuangan Bulanan</p>
                         </div>
                         <div style="text-align: right; font-size: 13px;">
@@ -352,7 +353,7 @@ export default function Reports() {
                     </table>
                     
                     <div style="text-align: center; font-size: 10px; color: #94a3b8; margin-top: 50px;">
-                        Dibuat secara otomatis oleh SakuPintar - Aplikasi Manajemen Keuangan Cerdas.
+                        Dibuat secara otomatis oleh Sakuta - Rencanakan hari ini, capai bersama.
                     </div>
                 </body>
             </html>
@@ -372,20 +373,21 @@ export default function Reports() {
                 
                 {/* ── Header ── */}
                 <div className="app-page-header">
-                    <div>
+                    <div className="min-w-0">
                         <h1 className="app-page-title">Analisis Laporan</h1>
                         <p className="app-page-description">Evaluasi arus kas, alokasi pengeluaran, dan rasio tabungan Anda.</p>
                     </div>
 
                     {/* Filters & Actions */}
-                    <div className="flex items-center flex-wrap gap-2">
+                    <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center sm:flex-wrap">
                         {/* Month Filter */}
-                        <div className="ui-filter-shell">
-                            <Calendar className="w-4 h-4 text-emerald-800" />
+                        <div className="ui-filter-shell col-span-2 min-w-0 sm:col-span-1">
+                            <Calendar aria-hidden="true" className="w-4 h-4 text-emerald-800" />
                             <select
+                                aria-label="Pilih bulan laporan"
                                 value={selectedMonth}
                                 onChange={(e) => setSelectedMonth(e.target.value)}
-                                className="ui-control bg-transparent text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer border-none p-0 pr-6 focus:ring-0"
+                                className="ui-control min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer border-none p-0 pr-6 focus:ring-0 sm:flex-none"
                             >
                                 {availableMonths.map((m) => (
                                     <option key={m} value={m}>
@@ -397,10 +399,11 @@ export default function Reports() {
 
                         {/* Export PDF Button */}
                         <button
+                            type="button"
                             onClick={exportPDF}
-                            className="ui-button bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5"
+                            className="reports-mobile-touch ui-button flex w-full items-center justify-center gap-1.5 bg-emerald-700 text-white hover:bg-emerald-800 sm:w-auto sm:justify-start"
                         >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                             PDF
@@ -408,10 +411,11 @@ export default function Reports() {
 
                         {/* Export Excel (CSV) Button */}
                         <button
+                            type="button"
                             onClick={exportCSV}
-                            className="ui-button border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5"
+                            className="reports-mobile-touch ui-button flex w-full items-center justify-center gap-1.5 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 sm:w-auto sm:justify-start"
                         >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                             Excel (CSV)
@@ -424,7 +428,7 @@ export default function Reports() {
                     {/* Income */}
                     <div className="ui-stat-card flex items-center gap-3">
                         <div className="w-10 h-10 bg-emerald-50 text-emerald-800 rounded-lg flex items-center justify-center shrink-0">
-                            <TrendingUp className="w-4 h-4" />
+                            <TrendingUp aria-hidden="true" className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
                             <span className="block text-slate-500 text-xs font-medium">Total Pemasukan</span>
@@ -435,7 +439,7 @@ export default function Reports() {
                     {/* Expenses */}
                     <div className="ui-stat-card flex items-center gap-3">
                         <div className="w-10 h-10 bg-rose-50 text-rose-800 rounded-lg flex items-center justify-center shrink-0">
-                            <TrendingDown className="w-4 h-4" />
+                            <TrendingDown aria-hidden="true" className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
                             <span className="block text-slate-500 text-xs font-medium">Total Pengeluaran</span>
@@ -446,7 +450,7 @@ export default function Reports() {
                     {/* Net Balance */}
                     <div className="ui-stat-card flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${stats.net > 0 ? 'bg-indigo-50 text-indigo-800' : stats.net < 0 ? 'bg-amber-50 text-amber-800' : 'bg-slate-50 text-slate-600'}`}>
-                            <Info className="w-4 h-4" />
+                            <Info aria-hidden="true" className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
                             <span className="block text-slate-500 text-xs font-medium">Sisa Arus Kas</span>
@@ -459,7 +463,7 @@ export default function Reports() {
                     {/* Saving Rate */}
                     <div className="ui-stat-card flex items-center gap-3">
                         <div className="w-10 h-10 bg-teal-50 text-teal-800 rounded-lg flex items-center justify-center shrink-0">
-                            <CheckCircle className="w-4 h-4" />
+                            <CheckCircle aria-hidden="true" className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
                             <span className="block text-slate-500 text-xs font-medium">Tingkat Menabung</span>
@@ -472,8 +476,8 @@ export default function Reports() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                     
                     {/* SVG Donut Chart (Left: 5/12) */}
-                    <div className="ui-card lg:col-span-5 flex flex-col items-center justify-center min-h-[300px]">
-                        <h3 className="ui-section-title mb-4 self-start">Alokasi Pengeluaran</h3>
+                    <div className="ui-card flex min-h-[300px] flex-col items-center justify-center lg:col-span-5">
+                        <h3 className="ui-section-title mb-4 w-full self-start">Alokasi Pengeluaran</h3>
                         
                         {stats.expense === 0 ? (
                             <div className="text-center py-8 text-slate-400 text-sm">
@@ -537,43 +541,53 @@ export default function Reports() {
                         <div className="space-y-4">
                             <h3 className="ui-section-title mb-2">Detail Pengeluaran per Kategori</h3>
                             
-                            <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1">
+                            <div className="reports-category-list max-h-[300px] space-y-3.5 overflow-y-auto pr-1">
                                 {categoryData.length === 0 ? (
                                     <p className="ui-empty py-6">Belum ada pengeluaran tercatat pada periode ini.</p>
                                 ) : (
-                                    categoryData.map((c) => (
-                                        <div
+                                    categoryData.map((c) => {
+                                        const isSelected = selectedCatId === c.id;
+                                        const isHovered = hoveredCatId === c.id;
+                                        return (
+                                        <button
                                             key={c.id}
+                                            type="button"
+                                            onClick={() => setSelectedCatId(c.id)}
                                             onMouseEnter={() => setHoveredCatId(c.id)}
                                             onMouseLeave={() => setHoveredCatId(null)}
-                                            className={`p-3 rounded-xl border transition-all flex flex-col gap-1.5 cursor-pointer ${
-                                                hoveredCatId === c.id
-                                                    ? 'border-emerald-300 bg-emerald-50/20'
-                                                    : 'border-stone-100 hover:border-stone-200'
+                                            onFocus={() => setSelectedCatId(c.id)}
+                                            aria-pressed={selectedCatId === c.id}
+                                            className={`w-full min-h-[44px] rounded-xl border p-3 text-left transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-700 focus-visible:outline-offset-2 ${
+                                                isSelected
+                                                    ? 'border-emerald-300 bg-emerald-50/30'
+                                                    : isHovered
+                                                        ? 'border-emerald-200 bg-emerald-50/10'
+                                                        : 'border-stone-100 hover:border-stone-200'
                                             }`}
                                         >
-                                            <div className="flex justify-between items-center text-xs">
-                                                <div className="flex items-center gap-2 font-medium text-slate-700">
-                                                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
-                                                    {c.name}
-                                                </div>
-                                                <div className="font-medium text-slate-800">
+                                            <span className="flex items-center justify-between text-xs">
+                                                <span className="flex items-center gap-2 font-medium text-slate-700">
+                                                    <span aria-hidden="true" className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: c.color }} />
+                                                    <span>{c.name}</span>
+                                                </span>
+                                                <span className="font-medium text-slate-800">
                                                     {fmtIDR(c.amount)}
                                                     <span className="text-[10px] text-slate-400 font-normal ml-1.5">
                                                         ({c.percentage}%)
                                                     </span>
-                                                </div>
-                                            </div>
+                                                </span>
+                                            </span>
                                             
                                             {/* Mini progress bar */}
-                                            <div className="w-full h-2 bg-stone-100 rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full rounded-full transition-all duration-500"
+                                            <span className="mt-1.5 block h-2 w-full overflow-hidden rounded-full bg-stone-100">
+                                                <span
+                                                    className="block h-full rounded-full transition-all duration-500"
                                                     style={{ backgroundColor: c.color, width: `${c.percentage}%` }}
                                                 />
-                                            </div>
-                                        </div>
-                                    ))
+                                            </span>
+                                        </button>
+                                        );
+                                    })
                                 )}
                             </div>
                         </div>
@@ -594,9 +608,9 @@ export default function Reports() {
                     ) : (
                         <div className="w-full pt-4">
                             {/* Bars Container */}
-                            <div className="h-48 flex items-end justify-between gap-1 overflow-x-auto pb-2 pr-1 scrollbar-thin">
+                            <div className="flex h-48 touch-pan-x items-end justify-between gap-1 overflow-x-auto pb-2 pr-1 scrollbar-thin">
                                 {dailyTrend.map((bar) => (
-                                    <div key={bar.day} className="flex-1 min-w-[12px] flex flex-col items-center gap-2 group h-full justify-end">
+                                    <div key={bar.day} className="group flex h-full min-w-[1.25rem] flex-1 flex-col items-center justify-end gap-2 sm:min-w-[12px]">
                                         {/* Value Tooltip */}
                                         <div className="ui-tooltip absolute mb-24 hidden group-hover:block bg-slate-800 text-white text-[9px] font-bold px-1.5 py-0.5 rounded z-10 pointer-events-none">
                                             {fmtIDR(bar.amount)}
@@ -627,7 +641,7 @@ export default function Reports() {
                 <div className="ui-card p-4 flex flex-col gap-3">
                     <div className="flex items-start gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-800 shrink-0">
-                            <BrainCircuit className="w-4 h-4" />
+                            <BrainCircuit aria-hidden="true" className="w-4 h-4" />
                         </div>
                         <div>
                             <h3 className="ui-section-title">Insight Laporan</h3>

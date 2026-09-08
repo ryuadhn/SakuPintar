@@ -69,12 +69,12 @@ export default function GoalDetailModal({ goal, isOpen, onClose }) {
                 {/* ── Progress Card ── */}
                 <div className="ui-card-subtle p-4 flex flex-col gap-4">
                     <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
                             <div className="w-12 h-12 bg-white rounded-xl flex justify-center items-center shadow-sm border border-slate-100 shrink-0">
                                 <Icon className="w-6 h-6 text-emerald-800" strokeWidth={1.75} />
                             </div>
-                            <div>
-                        <h4 className="text-slate-900 font-semibold text-base leading-5">{goal.title}</h4>
+                            <div className="min-w-0">
+                        <h4 className="break-words text-slate-900 font-semibold text-base leading-5">{goal.title}</h4>
                                 <p className="text-slate-500 text-xs mt-0.5">Target Selesai: {goal.deadlineLabel}</p>
                             </div>
                         </div>
@@ -90,13 +90,13 @@ export default function GoalDetailModal({ goal, isOpen, onClose }) {
                                 style={{ width: `${progress}%` }} 
                             />
                         </div>
-                        <div className="flex justify-between text-xs font-semibold">
-                            <span className="text-slate-900">{fmtIDR(goal.current)}</span>
-                            <span className="text-slate-500">Target {fmtIDR(goal.target)}</span>
+                        <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-xs font-semibold">
+                            <span className="min-w-0 break-words text-slate-900">{fmtIDR(goal.current)}</span>
+                            <span className="min-w-0 break-words text-right text-slate-500">Target {fmtIDR(goal.target)}</span>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200/60 text-xs">
+                    <div className="grid grid-cols-1 gap-4 border-t border-slate-200/60 pt-3 text-xs sm:grid-cols-2">
                         <div>
                             <span className="text-slate-500 block uppercase tracking-wider font-medium text-xs">Sisa Target</span>
                             <span className="text-slate-900 font-semibold text-sm mt-0.5">
@@ -121,7 +121,9 @@ export default function GoalDetailModal({ goal, isOpen, onClose }) {
 
                         <form onSubmit={handleSubmit} className="space-y-3.5">
                             {/* Segmented control for Type */}
-                            <div className="ui-segmented grid grid-cols-2">
+                            <fieldset>
+                                <legend className="sr-only">Jenis catatan</legend>
+                                <div className="ui-segmented grid grid-cols-2">
                                 <button
                                     type="button"
                                     onClick={() => { setType('deposit'); setError(''); }}
@@ -129,9 +131,10 @@ export default function GoalDetailModal({ goal, isOpen, onClose }) {
                                         type === 'deposit'
                                             ? 'is-active text-emerald-800'
                                             : ''
-                                    }`}
+                                     }`}
+                                    aria-pressed={type === 'deposit'}
                                 >
-                                    <Plus className="w-3.5 h-3.5" />
+                                    <Plus className="w-3.5 h-3.5" aria-hidden="true" />
                                     Setor Dana
                                 </button>
                                 <button
@@ -142,26 +145,31 @@ export default function GoalDetailModal({ goal, isOpen, onClose }) {
                                             ? 'is-active text-rose-800'
                                             : ''
                                     }`}
+                                    aria-pressed={type === 'withdraw'}
                                 >
-                                    <Minus className="w-3.5 h-3.5" />
+                                    <Minus className="w-3.5 h-3.5" aria-hidden="true" />
                                     Tarik Dana
                                 </button>
-                            </div>
+                                </div>
+                            </fieldset>
 
                             {/* Nominal Input */}
                             <div className="space-y-1">
-                                 <label className="ui-field-label block">Nominal (Rupiah)</label>
+                                 <label htmlFor="goal-entry-amount" className="ui-field-label block">Nominal (Rupiah)</label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-semibold text-sm">
                                         Rp
                                     </div>
                                     <input
+                                        id="goal-entry-amount"
                                         type="number"
                                         min="1"
                                         placeholder="Contoh: 250000"
                                         value={amount}
                                         onChange={(e) => { setAmount(e.target.value); setError(''); }}
                                          className="ui-control pl-9 pr-4 py-2.5 w-full text-sm text-slate-800 font-semibold"
+                                        aria-invalid={error ? 'true' : undefined}
+                                        aria-describedby={error ? 'goal-entry-error' : undefined}
                                         required
                                     />
                                 </div>
@@ -169,10 +177,11 @@ export default function GoalDetailModal({ goal, isOpen, onClose }) {
 
                             {/* Date Input */}
                             <div className="space-y-1">
-                                 <label className="ui-field-label block">Tanggal</label>
+                                 <label htmlFor="goal-entry-date" className="ui-field-label block">Tanggal</label>
                                 <div className="relative">
                                     <Calendar className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                                     <input
+                                        id="goal-entry-date"
                                         type="date"
                                         value={date}
                                         onChange={(e) => setDate(e.target.value)}
@@ -184,10 +193,11 @@ export default function GoalDetailModal({ goal, isOpen, onClose }) {
 
                             {/* Note Input */}
                             <div className="space-y-1">
-                                 <label className="ui-field-label block">Keterangan / Catatan</label>
+                                 <label htmlFor="goal-entry-note" className="ui-field-label block">Keterangan / Catatan</label>
                                 <div className="relative">
                                     <FileText className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                                     <input
+                                        id="goal-entry-note"
                                         type="text"
                                         placeholder="Contoh: Setoran minggu ke-1"
                                         value={note}
@@ -198,7 +208,7 @@ export default function GoalDetailModal({ goal, isOpen, onClose }) {
                             </div>
 
                             {error && (
-                                <p className="text-rose-600 text-xs font-semibold bg-rose-50 border border-rose-100 rounded-lg p-2.5 animate-pulse">
+                                <p id="goal-entry-error" role="alert" className="text-rose-600 text-xs font-semibold bg-rose-50 border border-rose-100 rounded-lg p-2.5 animate-pulse">
                                     {error}
                                 </p>
                             )}
@@ -258,12 +268,13 @@ export default function GoalDetailModal({ goal, isOpen, onClose }) {
                                                     {isDeposit ? fmtIDR(log.amount) : fmtIDR(Math.abs(log.amount))}
                                                 </span>
                                                 <button
+                                                    type="button"
                                                     onClick={() => handleDelete(log.id)}
                                                      className="ui-icon-button ui-icon-button-danger"
                                                      aria-label={`Hapus catatan ${log.note}`}
                                                     title="Hapus catatan"
                                                 >
-                                                    <Trash2 className="w-4 h-4" />
+                                                     <Trash2 className="w-4 h-4" aria-hidden="true" />
                                                 </button>
                                             </div>
                                         </div>
@@ -277,7 +288,7 @@ export default function GoalDetailModal({ goal, isOpen, onClose }) {
                 
                 {/* ── Footer ── */}
                 <div className="flex justify-end pt-3 border-t border-slate-100">
-                    <Button variant="secondary" onClick={onClose} className="px-5 py-2">
+                    <Button variant="secondary" onClick={onClose} className="w-full px-5 py-2 sm:w-auto">
                         Tutup
                     </Button>
                 </div>

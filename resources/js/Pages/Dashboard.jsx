@@ -8,6 +8,7 @@ import QuickAllocation from '../Components/Dashboard/QuickAllocation';
 import TransactionTable from '../Shared/TransactionTable';
 import TransactionRow from '../Shared/TransactionRow';
 import AddTransactionModal from '../Shared/AddTransactionModal';
+import MobileTransactionList from '../Shared/MobileTransactionList';
 import BudgetAlertBanner from '../Shared/BudgetAlertBanner';
 import Button from '../Components/UI/Button';
 import { useFinance } from '../Store/FinanceContext';
@@ -25,6 +26,21 @@ export default function Dashboard() {
     );
     const recent = useMemo(() => transactions.slice(0, 5), [transactions]);
 
+    const getRecentCategoryLabel = (transaction) => (
+        transaction.type === 'transfer' ? 'Transfer' : categoryById[transaction.categoryId]?.name || '-'
+    );
+    const getRecentWalletLabel = (transaction) => (
+        transaction.type === 'transfer'
+            ? `${walletById[transaction.fromWalletId]?.name || '?'} > ${walletById[transaction.toWalletId]?.name || '?'}`
+            : walletById[transaction.walletId]?.name || '-'
+    );
+    const getRecentAmountLabel = (transaction) => (
+        `${transaction.type === 'expense' ? '- ' : '+ '}${fmtIDR(transaction.amount)}`
+    );
+    const getRecentAmountClass = (transaction) => (
+        transaction.type === 'income' ? 'text-emerald-800' : transaction.type === 'expense' ? 'text-red-700' : 'text-slate-600'
+    );
+
     return (
         <AuthenticatedLayout>
             <div className="app-page">
@@ -39,7 +55,7 @@ export default function Dashboard() {
                         onClick={() => setIsAddModalOpen(true)}
                         className="shrink-0"
                     >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg aria-hidden="true" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                         </svg>
                         Tambah Transaksi
@@ -138,7 +154,19 @@ export default function Dashboard() {
                 </div>
 
                 {/* Section - Recent Activity Table */}
-                <TransactionTable>
+                <TransactionTable
+                    mobileContent={(
+                        <MobileTransactionList
+                            items={recent}
+                            loading={false}
+                            emptyMessage="Belum ada transaksi tercatat."
+                            getCategoryLabel={getRecentCategoryLabel}
+                            getWalletLabel={getRecentWalletLabel}
+                            getAmountLabel={getRecentAmountLabel}
+                            getAmountClass={getRecentAmountClass}
+                        />
+                    )}
+                >
                     {recent.length === 0 && (
                         <tr>
                         <td colSpan={4} className="py-10 px-6 text-center text-slate-500 text-sm">

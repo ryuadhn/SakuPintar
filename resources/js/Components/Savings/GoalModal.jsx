@@ -88,7 +88,7 @@ export default function GoalModal({ isOpen, onClose }) {
                     required
                 />
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Input
                         label="Target Nominal (Rupiah)"
                         type="number"
@@ -110,7 +110,7 @@ export default function GoalModal({ isOpen, onClose }) {
                     />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Input
                         label="Setoran Bulanan (Rupiah)"
                         type="number"
@@ -132,7 +132,7 @@ export default function GoalModal({ isOpen, onClose }) {
 
                 <div>
                     <label className="ui-field-label block mb-2">Pilih Ikon</label>
-                    <div className="grid grid-cols-6 gap-2">
+                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
                         {Object.entries(GOAL_ICONS).map(([key, { label, Icon }]) => {
                             const selected = iconKey === key;
                             return (
@@ -141,7 +141,7 @@ export default function GoalModal({ isOpen, onClose }) {
                                     type="button"
                                     onClick={() => setIconKey(key)}
                                     title={label}
-                                    className={`flex flex-col items-center gap-1.5 py-3 rounded-xl outline outline-1 transition-all ${selected
+                                    className={`flex min-h-[44px] flex-col items-center gap-1.5 rounded-xl py-3 outline outline-1 transition-all ${selected
                                         ? 'outline-emerald-700 bg-emerald-50'
                                         : 'outline-stone-200 bg-white hover:bg-stone-50'}`}
                                 >
@@ -173,9 +173,9 @@ export default function GoalModal({ isOpen, onClose }) {
                     </div>
                 )}
 
-                <div className="flex gap-3 justify-end pt-2">
-                    <Button type="button" variant="secondary" onClick={onClose} className="px-5 py-2.5">Batal</Button>
-                    <Button type="submit" variant="primary" className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800">
+                <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+                    <Button type="button" variant="secondary" onClick={onClose} className="w-full px-5 py-2.5 sm:w-auto">Batal</Button>
+                    <Button type="submit" variant="primary" className="w-full bg-emerald-700 px-5 py-2.5 hover:bg-emerald-800 sm:w-auto">
                         Simpan Target
                     </Button>
                 </div>

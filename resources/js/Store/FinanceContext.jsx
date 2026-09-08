@@ -168,7 +168,7 @@ const readRecurringMetadata = (userId) => {
         const parsed = raw ? JSON.parse(raw) : {};
         return parsed[userId] || {};
     } catch (error) {
-        console.warn('SakuPintar: gagal membaca metadata aturan rutin.', error);
+        console.warn('Sakuta: gagal membaca metadata aturan rutin.', error);
         return {};
     }
 };
@@ -181,7 +181,7 @@ const writeRecurringMetadata = (userId, ruleId, anchorDay) => {
         parsed[userId] = { ...(parsed[userId] || {}), [ruleId]: anchorDay };
         localStorage.setItem(RECURRING_METADATA_KEY, JSON.stringify(parsed));
     } catch (error) {
-        console.warn('SakuPintar: gagal menyimpan metadata aturan rutin.', error);
+        console.warn('Sakuta: gagal menyimpan metadata aturan rutin.', error);
     }
 };
 
@@ -194,20 +194,9 @@ const removeRecurringMetadata = (userId, ruleId) => {
         delete parsed[userId][ruleId];
         localStorage.setItem(RECURRING_METADATA_KEY, JSON.stringify(parsed));
     } catch (error) {
-        console.warn('SakuPintar: gagal menghapus metadata aturan rutin.', error);
+        console.warn('Sakuta: gagal menghapus metadata aturan rutin.', error);
     }
 };
-
-const emptyFinanceState = () => ({
-    wallets: [],
-    categories: seedCategories.map((category) => ({ ...category })),
-    transactions: [],
-    budgets: {},
-    recurringRules: [],
-    reminders: [],
-    savingsGoals: [],
-    invitations: [],
-});
 
 const processRecurring = (state) => {
     const today = todayISO();
@@ -358,7 +347,7 @@ const loadInitialState = () => {
             }
         }
     } catch (e) {
-        console.warn('SakuPintar: gagal membaca data tersimpan.', e);
+            console.warn('Sakuta: gagal membaca data tersimpan.', e);
     }
     return seedState();
 };
@@ -382,7 +371,7 @@ export function FinanceProvider({ children }) {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         } catch (e) {
-            console.warn('SakuPintar: gagal menyimpan data.', e);
+            console.warn('Sakuta: gagal menyimpan data.', e);
         }
     }, [state, user]);
 
@@ -398,8 +387,6 @@ export function FinanceProvider({ children }) {
                 cancelled = true;
             };
         }
-
-        setState(emptyFinanceState());
 
         const fetchSupabaseData = async () => {
             const userId = user.id;
@@ -513,7 +500,7 @@ export function FinanceProvider({ children }) {
                     try {
                         await rollbackPersistedRecurringChanges(userId, processed);
                     } catch (rollbackError) {
-                        console.error('SakuPintar: gagal membatalkan transaksi rutin yang tersimpan.', rollbackError);
+                        console.error('Sakuta: gagal membatalkan transaksi rutin yang tersimpan.', rollbackError);
                     }
                     if (cancelled) return;
                     setState(remoteState);
@@ -521,7 +508,7 @@ export function FinanceProvider({ children }) {
                 }
             } catch (error) {
                 if (cancelled) return;
-                console.error('SakuPintar: gagal memuat data dari Supabase.', error);
+                console.error('Sakuta: gagal memuat data dari Supabase.', error);
                 setSyncError('Data kalender dan tugas tidak dapat dimuat. Periksa koneksi Anda lalu coba lagi.');
             } finally {
                 if (!cancelled) setSyncLoading(false);
@@ -791,10 +778,10 @@ export function FinanceProvider({ children }) {
                     .maybeSingle();
                 persistedRule = response.data;
             } catch (lookupError) {
-                console.error('SakuPintar: gagal memverifikasi aturan rutin.', lookupError);
+                console.error('Sakuta: gagal memverifikasi aturan rutin.', lookupError);
             }
             if (persistedRule) return true;
-            console.error('SakuPintar: gagal menyimpan aturan rutin.', error);
+            console.error('Sakuta: gagal menyimpan aturan rutin.', error);
             removeRecurringMetadata(user.id, newId);
             setState((s) => ({ ...s, recurringRules: s.recurringRules.filter((r) => r.id !== newId) }));
             setCalendarError('Aturan rutin gagal disimpan. Periksa koneksi Anda lalu coba lagi.');
@@ -840,7 +827,7 @@ export function FinanceProvider({ children }) {
             if (!updatedRules || updatedRules.length === 0) throw new Error('Aturan rutin tidak ditemukan.');
             return true;
         } catch (error) {
-            console.error('SakuPintar: gagal mengubah status aturan rutin.', error);
+            console.error('Sakuta: gagal mengubah status aturan rutin.', error);
             setState((s) => ({
                     ...s,
                     recurringRules: s.recurringRules.map((rule) => (
@@ -876,7 +863,7 @@ export function FinanceProvider({ children }) {
             removeRecurringMetadata(user.id, id);
             return true;
         } catch (error) {
-            console.error('SakuPintar: gagal menghapus aturan rutin.', error);
+            console.error('Sakuta: gagal menghapus aturan rutin.', error);
             setState((s) => {
                 if (s.recurringRules.some((rule) => rule.id === id)) return s;
                 const rules = [...s.recurringRules];
@@ -937,10 +924,10 @@ export function FinanceProvider({ children }) {
                     .maybeSingle();
                 persistedReminder = response.data;
             } catch (lookupError) {
-                console.error('SakuPintar: gagal memverifikasi pengingat.', lookupError);
+                console.error('Sakuta: gagal memverifikasi pengingat.', lookupError);
             }
             if (persistedReminder) return true;
-            console.error('SakuPintar: gagal menyimpan pengingat.', error);
+                console.error('Sakuta: gagal menyimpan pengingat.', error);
             setState((s) => ({ ...s, reminders: (s.reminders || []).filter((item) => item.id !== newId) }));
             setCalendarError('Pengingat gagal disimpan. Periksa koneksi Anda lalu coba lagi.');
             return false;
@@ -991,7 +978,7 @@ export function FinanceProvider({ children }) {
             if (!updatedReminders || updatedReminders.length === 0) throw new Error('Pengingat tidak ditemukan.');
             return true;
         } catch (error) {
-            console.error('SakuPintar: gagal memperbarui pengingat.', error);
+            console.error('Sakuta: gagal memperbarui pengingat.', error);
             setState((s) => ({
                 ...s,
                 reminders: (s.reminders || []).map((reminder) => (
@@ -1031,7 +1018,7 @@ export function FinanceProvider({ children }) {
             if (!updatedReminders || updatedReminders.length === 0) throw new Error('Pengingat tidak ditemukan.');
             return true;
         } catch (error) {
-            console.error('SakuPintar: gagal mengubah status pengingat.', error);
+            console.error('Sakuta: gagal mengubah status pengingat.', error);
             setState((s) => ({
                 ...s,
                 reminders: (s.reminders || []).map((reminder) => (
@@ -1066,7 +1053,7 @@ export function FinanceProvider({ children }) {
             if (!deletedReminders || deletedReminders.length === 0) throw new Error('Pengingat tidak ditemukan.');
             return true;
         } catch (error) {
-            console.error('SakuPintar: gagal menghapus pengingat.', error);
+            console.error('Sakuta: gagal menghapus pengingat.', error);
             setState((s) => {
                 if ((s.reminders || []).some((reminder) => reminder.id === id)) return s;
                 const nextReminders = [...(s.reminders || [])];
@@ -1275,7 +1262,7 @@ export function FinanceProvider({ children }) {
                 const responseError = responses.find((response) => response.error)?.error;
                 if (responseError) throw responseError;
             } catch (error) {
-                console.error('SakuPintar: gagal mereset data.', error);
+                console.error('Sakuta: gagal mereset data.', error);
                 setCalendarError('Data belum berhasil direset. Periksa koneksi Anda lalu coba lagi.');
                 return false;
             }

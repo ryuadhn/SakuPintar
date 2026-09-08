@@ -65,13 +65,14 @@ export default function WalletModal({ isOpen, onClose, editing = null }) {
 
                 <div>
                      <label className="ui-field-label block mb-2">Warna Dompet</label>
-                    <div className="grid grid-cols-7 gap-2">
+                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
                         {WALLET_COLORS.map((item) => (
                             <button
                                 key={item}
                                 type="button"
                                 onClick={() => setColor(item)}
-                                 className={`min-h-[44px] rounded-lg border transition-all ${color === item ? 'border-slate-900 ring-2 ring-slate-900/10' : 'border-slate-200'}`}
+                                aria-label={`Pilih warna ${item}`}
+                                className={`min-h-[44px] rounded-lg border transition-all ${color === item ? 'border-slate-900 ring-2 ring-slate-900/10' : 'border-slate-200'}`}
                                 style={{ backgroundColor: item }}
                                 title={item}
                             />
@@ -79,11 +80,11 @@ export default function WalletModal({ isOpen, onClose, editing = null }) {
                     </div>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-2">
-                    <Button type="button" variant="secondary" onClick={onClose} className="px-5 py-2.5">
+                <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+                    <Button type="button" variant="secondary" onClick={onClose} className="w-full px-5 py-2.5 sm:w-auto">
                         Batal
                     </Button>
-                    <Button type="submit" variant="primary" className="px-5 py-2.5 bg-emerald-700">
+                    <Button type="submit" variant="primary" className="w-full bg-emerald-700 px-5 py-2.5 sm:w-auto">
                         {editing ? 'Simpan Perubahan' : 'Simpan Dompet'}
                     </Button>
                 </div>

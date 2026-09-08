@@ -14,7 +14,7 @@ const loadUsers = () => {
         const arr = raw ? JSON.parse(raw) : null;
         if (Array.isArray(arr) && arr.length > 0) return arr;
     } catch (e) {
-        console.warn('SakuPintar: gagal membaca data pengguna.', e);
+        console.warn('Sakuta: gagal membaca data pengguna.', e);
     }
     const seeded = [{ name: 'Demo User', email: DEMO_EMAIL, passHash: hashPass(DEMO_PASS) }];
     try {
@@ -57,7 +57,7 @@ export function AuthProvider({ children }) {
             }
             setAuthLoading(false);
         }).catch((e) => {
-            console.error('SakuPintar: gagal membaca sesi dari Supabase.', e);
+            console.error('Sakuta: gagal membaca sesi dari Supabase.', e);
             setUser(null);
             setAuthLoading(false);
         });

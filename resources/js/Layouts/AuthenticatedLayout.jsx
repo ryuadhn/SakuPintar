@@ -1,10 +1,25 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import icon from '../icon.svg';
 import { useAuth } from '../Store/AuthContext';
 import { useFinance } from '../Store/FinanceContext';
 import { fmtIDR } from '../Utils/format';
-import { ListChecks } from 'lucide-react';
+import { Lightbulb, ListChecks, Map, MoreHorizontal, Tags } from 'lucide-react';
+
+const MOBILE_PRIMARY_LINKS = [
+    ['/dashboard', 'Dashboard'],
+    ['/wallets', 'Dompet'],
+    ['/savings', 'Target'],
+    ['/calendar', 'Kalender'],
+    ['/tasks', 'Tugas'],
+    ['/reports', 'Laporan'],
+];
+
+const MOBILE_SECONDARY_LINKS = [
+    ['/planner', 'Perencana AI', Map],
+    ['/ai-advisor', 'Tanya AI', Lightbulb],
+    ['/categories', 'Kategori', Tags],
+];
 
 export default function AuthenticatedLayout({ children }) {
     const location = useLocation();
@@ -16,6 +31,7 @@ export default function AuthenticatedLayout({ children }) {
     } = useFinance();
     const [searchTerm, setSearchTerm] = useState('');
     const [notifOpen, setNotifOpen] = useState(false);
+    const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
     const displayName = user?.name || 'Pengguna';
     const initial = displayName.charAt(0).toUpperCase();
@@ -100,6 +116,22 @@ export default function AuthenticatedLayout({ children }) {
     const totalNotifCount = allNotifications.length + pendingInvites.length;
 
     const isActive = (path) => location.pathname === path;
+    const isMobileSecondaryActive = MOBILE_SECONDARY_LINKS.some(([path]) => isActive(path));
+
+    useEffect(() => {
+        if (!mobileMoreOpen) return undefined;
+
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') setMobileMoreOpen(false);
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [mobileMoreOpen]);
+
+    useEffect(() => {
+        setMobileMoreOpen(false);
+    }, [location.pathname]);
     
     const getLinkClass = (path) => {
         const base = "app-nav-item flex items-center justify-center lg:justify-start ";
@@ -115,11 +147,9 @@ export default function AuthenticatedLayout({ children }) {
             <aside className="app-sidebar bg-white text-slate-700 flex flex-col justify-between hidden sm:flex border-r transition-all duration-300">
                 <div className="space-y-6">
                     {/* Brand */}
-                    <div className="flex items-center justify-center lg:justify-start gap-2.5 px-2">
-                        <div className="w-8 h-8 bg-[#0e6c4a] rounded-lg flex justify-center items-center shadow-sm shadow-emerald-950/15 shrink-0">
-                            <img className="w-[18px] h-[17px]" src={icon} alt="SakuPintar logo" draggable={false} />
-                        </div>
-                        <span className="font-semibold text-[#0e6c4a] text-base tracking-tight hidden lg:inline">SakuPintar</span>
+                    <div className="flex items-center justify-center lg:justify-start gap-2 px-2">
+                        <img className="w-11 h-11 rounded-lg shrink-0" src={icon} alt="Sakuta logo" draggable={false} />
+                        <span className="font-semibold text-[#0e6c4a] text-[20px] tracking-tight hidden lg:inline">Sakuta</span>
                     </div>
                     
                     {/* Menu Navigasi */}
@@ -221,12 +251,16 @@ export default function AuthenticatedLayout({ children }) {
             </aside>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <div className="app-shell-main flex-1 flex flex-col min-w-0 overflow-hidden">
                 {/* Navbar Atas */}
-                <header className="app-topbar border-b backdrop-blur-[6px] flex items-center justify-between z-20">
+                <header className="app-topbar border-b backdrop-blur-[6px] flex items-center justify-between gap-2 z-20">
+                    <Link to="/dashboard" aria-label="Sakuta, ke Dashboard" className="app-topbar-brand flex shrink-0 items-center gap-2 sm:hidden">
+                        <img className="h-8 w-8 rounded-md shrink-0" src={icon} alt="Sakuta logo" draggable={false} />
+                        <span className="app-topbar-brand-name font-semibold tracking-tight text-[#0e6c4a]">Sakuta</span>
+                    </Link>
                     {/* Search Field */}
                     <form
-                        className="relative max-w-md w-full"
+                        className="relative min-w-0 w-full max-w-md flex-1"
                         onSubmit={(e) => {
                             e.preventDefault();
                             if (searchTerm.trim()) navigate(`/wallets?q=${encodeURIComponent(searchTerm.trim())}`);
@@ -247,7 +281,7 @@ export default function AuthenticatedLayout({ children }) {
                     </form>
 
                 {/* Notifications & Action */}
-                <div className="flex items-center gap-3 relative">
+                <div className="relative flex shrink-0 items-center gap-2 sm:gap-3">
                         <button
                             type="button"
                             aria-label={notifOpen ? 'Tutup pemberitahuan' : 'Buka pemberitahuan'}
@@ -269,7 +303,7 @@ export default function AuthenticatedLayout({ children }) {
                     {notifOpen && (
                         <>
                             <div className="fixed inset-0 z-30" onClick={() => setNotifOpen(false)} />
-                             <div id="notification-panel" role="region" aria-label="Pusat Pemberitahuan" className="ui-popover absolute right-0 top-full mt-2 w-80 bg-white border border-slate-100 z-40 overflow-hidden">
+                             <div id="notification-panel" role="region" aria-label="Pusat Pemberitahuan" className="notification-popover ui-popover absolute right-0 top-full mt-2 bg-white border border-slate-100 z-40 overflow-hidden">
                                 <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/60">
                                      <p className="font-semibold text-sm text-slate-800">Pusat pemberitahuan</p>
                                      <p className="text-xs text-slate-500">Informasi dan peringatan keuangan Anda</p>
@@ -293,13 +327,13 @@ export default function AuthenticatedLayout({ children }) {
                                                     <div className="flex gap-2 justify-end">
                                                         <button
                                                             onClick={() => rejectSavingsGoalInvitation(inv.id)}
-                                                             className="ui-button-compact bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                                                              className="notification-action ui-button-compact bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
                                                         >
                                                             Tolak
                                                         </button>
                                                         <button
                                                             onClick={() => acceptSavingsGoalInvitation(inv.id)}
-                                                             className="ui-button-compact bg-emerald-800 hover:bg-emerald-700 text-white transition-colors"
+                                                              className="notification-action ui-button-compact bg-emerald-800 hover:bg-emerald-700 text-white transition-colors"
                                                         >
                                                             Terima
                                                         </button>
@@ -387,27 +421,65 @@ export default function AuthenticatedLayout({ children }) {
                 
                 {/* Content body wrapper */}
                 <main className="app-content flex-1 overflow-y-auto">
-                    <nav
-                        aria-label="Navigasi mobile"
-                        className="-mx-4 -mt-4 mb-4 flex gap-1 overflow-x-auto border-b border-[#dce6df] bg-white px-3 py-2 sm:hidden"
-                    >
-                        {[
-                            ['/dashboard', 'Dashboard'],
-                            ['/wallets', 'Dompet'],
-                            ['/savings', 'Tabungan'],
-                            ['/calendar', 'Kalender'],
-                            ['/tasks', 'Tugas'],
-                            ['/reports', 'Laporan'],
-                        ].map(([path, label]) => (
-                            <Link
-                                key={path}
-                                to={path}
-                                className={`min-h-[44px] shrink-0 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${isActive(path) ? 'bg-emerald-800 text-white' : 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-800'}`}
-                            >
-                                {label}
-                            </Link>
-                        ))}
-                    </nav>
+                    <div className="mobile-nav-wrapper -mx-4 -mt-4 mb-4 relative sm:hidden">
+                        <div className="mobile-nav-shell flex border-b border-[#dce6df] bg-white">
+                            <nav aria-label="Navigasi utama mobile" className="mobile-nav-scroll min-w-0 flex-1 overflow-x-auto px-3 py-2">
+                                <div className="flex min-w-max gap-1">
+                                    {MOBILE_PRIMARY_LINKS.map(([path, label]) => (
+                                        <Link
+                                            key={path}
+                                            to={path}
+                                            aria-current={isActive(path) ? 'page' : undefined}
+                                            className={`min-h-[44px] shrink-0 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${isActive(path) ? 'bg-emerald-800 text-white' : 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-800'}`}
+                                        >
+                                            {label}
+                                        </Link>
+                                    ))}
+                                </div>
+                            </nav>
+
+                            <div className="mobile-more-anchor relative shrink-0 border-l border-[#dce6df] bg-white px-2 py-2">
+                                <button
+                                    type="button"
+                                    aria-label={mobileMoreOpen ? 'Tutup menu lainnya' : 'Buka menu lainnya'}
+                                    aria-expanded={mobileMoreOpen}
+                                    aria-controls="mobile-more-menu"
+                                    aria-haspopup="true"
+                                    onClick={() => setMobileMoreOpen((open) => !open)}
+                                    className={`mobile-more-trigger inline-flex min-h-[44px] items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium transition-colors ${isMobileSecondaryActive || mobileMoreOpen ? 'bg-emerald-800 text-white' : 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-800'}`}
+                                >
+                                    <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                                    <span>Lainnya</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {mobileMoreOpen && (
+                            <>
+                                <button
+                                    type="button"
+                                    tabIndex={-1}
+                                    aria-label="Tutup menu lainnya"
+                                    className="fixed inset-0 z-30 cursor-default"
+                                    onClick={() => setMobileMoreOpen(false)}
+                                />
+                                <div id="mobile-more-menu" aria-label="Navigasi tambahan mobile" className="mobile-more-menu ui-popover absolute right-3 top-full z-40 mt-2 bg-white p-2">
+                                    {MOBILE_SECONDARY_LINKS.map(([path, label, Icon]) => (
+                                        <Link
+                                            key={path}
+                                            to={path}
+                                            aria-current={isActive(path) ? 'page' : undefined}
+                                            onClick={() => setMobileMoreOpen(false)}
+                                            className={`flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${isActive(path) ? 'bg-emerald-800 text-white' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-800'}`}
+                                        >
+                                            <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                            <span>{label}</span>
+                                        </Link>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </div>
                     {children}
                 </main>
             </div>

@@ -13,101 +13,105 @@ function GoalCard({ goal, onDelete, onClick, onCollaborate }) {
     const isDone = goal.progress >= 100;
 
     return (
-        <div 
-            onClick={onClick}
-            className="ui-card p-5 flex flex-col gap-4 transition-colors cursor-pointer hover:outline hover:outline-emerald-700/20"
-        >
-            {/* Top: Icon + Title + Progress */}
-            <div className="flex justify-between items-start gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-11 h-11 bg-stone-100 rounded-xl flex justify-center items-center shrink-0">
-                        {(() => {
-                            const Icon = GOAL_ICONS[goal.iconKey]?.Icon || GOAL_ICONS.home.Icon;
-                            return <Icon className="w-6 h-6 text-emerald-800" strokeWidth={1.75} />;
-                        })()}
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                            <h4 className="text-zinc-900 text-base font-semibold leading-5 truncate">{goal.title}</h4>
-                            {goal.isShared && (
-                                <span className="ui-badge bg-emerald-50 text-emerald-700 border-emerald-200/50 shrink-0">
-                                    Bersama
-                                </span>
-                            )}
+        <article className="ui-card relative p-5 transition-colors hover:outline hover:outline-emerald-700/20">
+            <button
+                type="button"
+                onClick={onClick}
+                className="absolute inset-0 z-0 w-full cursor-pointer rounded-[inherit] focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-700 focus-visible:outline-offset-2"
+                aria-label={`Buka detail target ${goal.title}`}
+            />
+            <div className="pointer-events-none relative z-10 flex flex-col gap-4">
+                {/* Top: Icon + Title + Progress */}
+                <div className="flex items-start justify-between gap-3 pr-14">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-stone-100">
+                            {(() => {
+                                const Icon = GOAL_ICONS[goal.iconKey]?.Icon || GOAL_ICONS.home.Icon;
+                                return <Icon className="h-6 w-6 text-emerald-800" strokeWidth={1.75} aria-hidden="true" />;
+                            })()}
                         </div>
-                        <span className="text-neutral-700 text-xs font-normal leading-4 mt-0.5">
-                            Target Selesai: {goal.deadlineLabel} {goal.partnerEmail ? `• ${goal.partnerEmail}` : ''}
+                        <div className="flex min-w-0 flex-col">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <h4 className="truncate text-base font-semibold leading-5 text-zinc-900">{goal.title}</h4>
+                                {goal.isShared && (
+                                    <span className="ui-badge shrink-0 border-emerald-200/50 bg-emerald-50 text-emerald-700">
+                                        Bersama
+                                    </span>
+                                )}
+                            </div>
+                            <span className="mt-0.5 text-xs font-normal leading-4 text-neutral-700">
+                                Target Selesai: {goal.deadlineLabel} {goal.partnerEmail ? `• ${goal.partnerEmail}` : ''}
+                            </span>
+                        </div>
+                    </div>
+                    {isDone ? (
+                        <span className="ui-badge shrink-0 self-start border-emerald-200 bg-emerald-100 text-emerald-800">
+                            Selesai
+                        </span>
+                    ) : (
+                        <div className="flex shrink-0 flex-col items-end">
+                            <span className="text-xs font-medium text-neutral-700">Progres</span>
+                            <span className="text-xl font-semibold leading-7 text-emerald-800">{goal.progress}%</span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Progress Bar */}
+                <div className="flex flex-col gap-2">
+                    <div className="flex justify-between text-xs font-medium leading-4">
+                        <span className="text-zinc-900">{fmtIDR(goal.current)}</span>
+                        <span className="text-neutral-700">Target {fmtIDR(goal.target)}</span>
+                    </div>
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-neutral-200">
+                        <div
+                            className="h-full rounded-full bg-emerald-800 transition-all duration-700"
+                            style={{ width: `${Math.min(100, goal.progress)}%` }}
+                        />
+                    </div>
+                </div>
+
+                {/* Footer Stats */}
+                <div className="grid grid-cols-2 items-center gap-3 border-t border-stone-200 pt-3 pr-14">
+                    <div className="flex flex-col">
+                        <span className="text-xs font-medium text-neutral-700">Setoran bulanan</span>
+                        <span className="mt-1 text-sm font-semibold leading-5 text-zinc-900">{fmtIDR(goal.monthly)}</span>
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-xs font-medium text-neutral-700">Sisa waktu</span>
+                        <span className="mt-1 text-sm font-semibold leading-5 text-zinc-900">
+                            {isDone ? 'Target Tercapai' : `${goal.remaining} Bulan`}
                         </span>
                     </div>
                 </div>
-                {isDone ? (
-                        <span className="ui-badge shrink-0 self-start bg-emerald-100 text-emerald-800 border-emerald-200">
-                        Selesai
-                    </span>
-                ) : (
-                    <div className="flex items-center gap-3 shrink-0">
-                        <button
-                            onClick={(e) => { 
-                                e.stopPropagation(); 
-                                onCollaborate(goal); 
-                            }}
-                            className="ui-icon-button"
-                            aria-label={`Kelola kolaborasi target ${goal.title}`}
-                            title="Kelola Kolaborasi Target"
-                        >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                            </svg>
-                        </button>
-                        <div className="flex flex-col items-end shrink-0">
-                            <span className="text-neutral-700 text-xs font-medium">Progres</span>
-                            <span className="text-emerald-800 text-xl font-semibold leading-7">{goal.progress}%</span>
-                        </div>
-                    </div>
-                )}
             </div>
 
-            {/* Progress Bar */}
-            <div className="flex flex-col gap-2">
-                <div className="flex justify-between text-xs font-medium leading-4">
-                    <span className="text-zinc-900">{fmtIDR(goal.current)}</span>
-                    <span className="text-neutral-700">Target {fmtIDR(goal.target)}</span>
-                </div>
-                <div className="w-full h-2.5 bg-neutral-200 rounded-full overflow-hidden">
-                    <div
-                        className="h-full bg-emerald-800 rounded-full transition-all duration-700"
-                        style={{ width: `${Math.min(100, goal.progress)}%` }}
-                    />
-                </div>
-            </div>
-
-            {/* Footer Stats */}
-            <div className="pt-3 border-t border-stone-200 grid grid-cols-2 gap-3 items-center">
-                <div className="flex flex-col">
-                    <span className="text-neutral-700 text-xs font-medium">Setoran bulanan</span>
-                    <span className="text-zinc-900 text-sm font-semibold leading-5 mt-1">{fmtIDR(goal.monthly)}</span>
-                </div>
-                <div className="flex flex-col">
-                    <span className="text-neutral-700 text-xs font-medium">Sisa waktu</span>
-                    <span className="text-zinc-900 text-sm font-semibold leading-5 mt-1">
-                        {isDone ? 'Target Tercapai' : `${goal.remaining} Bulan`}
-                    </span>
-                </div>
+            {!isDone && (
                 <button
-                    onClick={(e) => { 
-                        e.stopPropagation(); 
-                        if (window.confirm(`Hapus target "${goal.title}"?`)) onDelete(goal.id); 
-                    }}
-                    className="ui-icon-button ui-icon-button-danger justify-self-end"
-                    aria-label={`Hapus target ${goal.title}`}
-                    title="Hapus target"
+                    type="button"
+                    onClick={() => onCollaborate(goal)}
+                    className="ui-icon-button absolute right-5 top-5 z-20"
+                    aria-label={`Kelola kolaborasi target ${goal.title}`}
+                    title="Kelola Kolaborasi Target"
                 >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
                 </button>
-            </div>
-        </div>
+            )}
+            <button
+                type="button"
+                onClick={() => {
+                    if (window.confirm(`Hapus target "${goal.title}"?`)) onDelete(goal.id);
+                }}
+                className="ui-icon-button ui-icon-button-danger absolute bottom-5 right-5 z-20"
+                aria-label={`Hapus target ${goal.title}`}
+                title="Hapus target"
+            >
+                <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+            </button>
+        </article>
     );
 }
 
@@ -632,31 +636,36 @@ export default function SavingsGoals() {
                         </div>
 
                         {/* Sort dropdown */}
-                        <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2">
+                        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+                            <div className="inline-flex items-center gap-2">
                                 <svg width="15" height="10" viewBox="0 0 15 10" fill="none">
                                     <path d="M0 10V8.33333H5V10H0ZM0 5.83333V4.16667H10V5.83333H0ZM0 1.66667V0H15V1.66667H0Z" fill="#3F4943" />
                                 </svg>
                                 <span className="text-neutral-700 text-sm font-semibold leading-4 tracking-wide">Urutkan:</span>
                             </div>
-                            <div className="relative">
+                            <div className="relative min-w-0 flex-1 sm:flex-none">
                                 <button
+                                    type="button"
                                     onClick={(e) => { e.stopPropagation(); setSortOpen((v) => !v); }}
-                                     className="ui-button w-44 justify-between border border-stone-300 bg-white text-zinc-900 hover:bg-stone-50"
+                                    aria-expanded={sortOpen}
+                                    aria-controls="savings-sort-menu"
+                                    className="ui-button inline-flex min-h-[2.375rem] w-full min-w-0 items-center justify-between border border-stone-300 bg-white text-zinc-900 hover:bg-stone-50 sm:w-40"
                                 >
-                                    <span className="text-zinc-900 text-sm font-semibold leading-4 tracking-wide whitespace-nowrap">{sortBy}</span>
+                                    <span className="truncate text-left text-sm font-semibold leading-4 tracking-wide">{sortBy}</span>
                                     <svg
                                         width="21" height="21" viewBox="0 0 21 21" fill="none"
-                                        className={`transition-transform ${sortOpen ? 'rotate-180' : ''}`}
+                                        aria-hidden="true"
+                                        className={`shrink-0 transition-transform ${sortOpen ? 'rotate-180' : ''}`}
                                     >
                                         <path d="M6.2998 8.40002L10.4998 12.6L14.6998 8.40002" stroke="#6B7280" strokeWidth="1.575" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
                                 </button>
                                 {sortOpen && (
-                                    <div className="ui-popover absolute right-0 mt-2 w-44 bg-white outline outline-1 outline-stone-300 z-20 overflow-hidden py-1">
+                                    <div id="savings-sort-menu" className="ui-popover absolute right-0 z-20 mt-2 w-full min-w-40 overflow-hidden bg-white py-1 outline outline-1 outline-stone-300 sm:w-40">
                                         {SORT_OPTIONS.map((opt) => (
                                             <button
                                                 key={opt}
+                                                type="button"
                                                 onClick={() => { setSortBy(opt); setSortOpen(false); }}
                                              className={`ui-menu-item ${opt === sortBy ? 'is-active' : ''} ${opt === sortBy ? 'text-emerald-800' : 'text-zinc-900'
                                                     }`}

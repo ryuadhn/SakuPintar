@@ -66,8 +66,9 @@ export default function CategoryModal({ isOpen, onClose, editing = null }) {
 
                 {!editing && (
                     <div>
-                         <label className="ui-field-label block mb-1.5">Tipe</label>
+                         <label htmlFor="category-type" className="ui-field-label block mb-1.5">Tipe</label>
                         <select
+                             id="category-type"
                              className="ui-control block w-full bg-white px-3 py-2.5"
                             value={type}
                             onChange={(e) => setType(e.target.value)}
@@ -89,12 +90,12 @@ export default function CategoryModal({ isOpen, onClose, editing = null }) {
                     />
                 )}
 
-                <div className="flex gap-3 justify-end pt-2 items-center">
+                <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-end">
                     {editing && editing.deletable !== false && (
                         <Button
                             type="button"
                             variant="outline"
-                            className={`px-5 py-2.5 mr-auto ${confirmDelete
+                            className={`w-full px-5 py-2.5 sm:mr-auto sm:w-auto ${confirmDelete
                                 ? '!border-red-500 !bg-red-600 !text-white hover:!bg-red-700'
                                 : '!border-red-300 !text-red-600 hover:!bg-red-50'}`}
                             onClick={handleDelete}
@@ -102,8 +103,8 @@ export default function CategoryModal({ isOpen, onClose, editing = null }) {
                             {confirmDelete ? 'Yakin Hapus?' : 'Hapus'}
                         </Button>
                     )}
-                    <Button type="button" variant="secondary" onClick={onClose} className="px-5 py-2.5">Batal</Button>
-                    <Button type="submit" variant="primary" className="px-5 py-2.5 bg-emerald-600">
+                    <Button type="button" variant="secondary" onClick={onClose} className="w-full px-5 py-2.5 sm:w-auto">Batal</Button>
+                    <Button type="submit" variant="primary" className="w-full bg-emerald-600 px-5 py-2.5 sm:w-auto">
                         {editing ? 'Simpan' : 'Tambah Kategori'}
                     </Button>
                 </div>

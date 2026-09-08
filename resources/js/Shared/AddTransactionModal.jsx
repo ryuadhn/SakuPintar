@@ -11,8 +11,8 @@ const TYPE_OPTIONS = [
     { value: 'transfer', label: 'Transfer' },
 ];
 
-export default function AddTransactionModal({ isOpen, onClose, editing = null, initialType = 'expense' }) {
-    const { categories, wallets, addTransaction, updateTransaction, deleteTransaction, addTransfer } = useFinance();
+export default function AddTransactionModal({ isOpen, onClose, editing = null, initialType = 'expense', onRequestDelete }) {
+    const { categories, wallets, addTransaction, updateTransaction, addTransfer } = useFinance();
 
     const [type, setType] = useState('expense');
     const [title, setTitle] = useState('');
@@ -242,9 +242,9 @@ export default function AddTransactionModal({ isOpen, onClose, editing = null, i
                     </div>
                 )}
 
-                <div>
-                    <label className="ui-field-label block mb-1.5">Tipe Transaksi</label>
-                    <div className="ui-segmented grid grid-cols-3">
+                <fieldset>
+                    <legend className="ui-field-label mb-1.5 block">Tipe Transaksi</legend>
+                    <div className="ui-segmented grid grid-cols-1 min-[430px]:grid-cols-3">
                         {TYPE_OPTIONS.map((opt) => (
                             <button
                                 key={opt.value}
@@ -257,12 +257,13 @@ export default function AddTransactionModal({ isOpen, onClose, editing = null, i
                                     }
                                 }}
                                 className={`ui-segmented-button ${type === opt.value ? 'is-active text-emerald-700' : ''}`}
+                                aria-pressed={type === opt.value}
                             >
                                 {opt.label}
                             </button>
                         ))}
                     </div>
-                </div>
+                </fieldset>
 
                 <Input
                     label="Nama Transaksi"
@@ -284,24 +285,28 @@ export default function AddTransactionModal({ isOpen, onClose, editing = null, i
                 />
 
                 {type !== 'transfer' ? (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
-                            <label className="ui-field-label block mb-1.5">Kategori</label>
+                            <label htmlFor="transaction-category" className="ui-field-label block mb-1.5">Kategori</label>
                             <select
+                                id="transaction-category"
                                 className={selectClass}
                                 value={categoryId}
                                 onChange={(e) => setCategoryId(e.target.value)}
+                                aria-invalid={errors.categoryId ? 'true' : undefined}
+                                aria-describedby={errors.categoryId ? 'transaction-category-error' : undefined}
                             >
                                 <option value="">Pilih kategori...</option>
                                 {relevantCategories.map((c) => (
                                     <option key={c.id} value={c.id}>{c.name}</option>
                                 ))}
                             </select>
-                            {errors.categoryId && <p className="mt-1 text-sm text-red-600">{errors.categoryId}</p>}
+                            {errors.categoryId && <p id="transaction-category-error" role="alert" className="mt-1 text-sm text-red-600">{errors.categoryId}</p>}
                         </div>
                         <div>
-                            <label className="ui-field-label block mb-1.5">Dompet</label>
+                            <label htmlFor="transaction-wallet" className="ui-field-label block mb-1.5">Dompet</label>
                             <select
+                                id="transaction-wallet"
                                 className={selectClass}
                                 value={walletId}
                                 onChange={(e) => setWalletId(e.target.value)}
@@ -313,37 +318,43 @@ export default function AddTransactionModal({ isOpen, onClose, editing = null, i
                         </div>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
-                            <label className="ui-field-label block mb-1.5">Dari Dompet</label>
+                            <label htmlFor="transaction-from-wallet" className="ui-field-label block mb-1.5">Dari Dompet</label>
                             <select
+                                id="transaction-from-wallet"
                                 className={selectClass}
                                 value={fromWalletId}
                                 onChange={(e) => setFromWalletId(e.target.value)}
+                                aria-invalid={errors.fromWalletId ? 'true' : undefined}
+                                aria-describedby={errors.fromWalletId ? 'transaction-from-wallet-error' : undefined}
                             >
                                 {wallets.filter((w) => w.id !== toWalletId).map((w) => (
                                     <option key={w.id} value={w.id}>{w.name}</option>
                                 ))}
                             </select>
-                            {errors.fromWalletId && <p className="mt-1 text-sm text-red-600">{errors.fromWalletId}</p>}
+                            {errors.fromWalletId && <p id="transaction-from-wallet-error" role="alert" className="mt-1 text-sm text-red-600">{errors.fromWalletId}</p>}
                         </div>
                         <div>
-                            <label className="ui-field-label block mb-1.5">Ke Dompet</label>
+                            <label htmlFor="transaction-to-wallet" className="ui-field-label block mb-1.5">Ke Dompet</label>
                             <select
+                                id="transaction-to-wallet"
                                 className={selectClass}
                                 value={toWalletId}
                                 onChange={(e) => setToWalletId(e.target.value)}
+                                aria-invalid={errors.toWalletId ? 'true' : undefined}
+                                aria-describedby={errors.toWalletId ? 'transaction-to-wallet-error' : undefined}
                             >
                                 {wallets.filter((w) => w.id !== fromWalletId).map((w) => (
                                     <option key={w.id} value={w.id}>{w.name}</option>
                                 ))}
                             </select>
-                            {errors.toWalletId && <p className="mt-1 text-sm text-red-600">{errors.toWalletId}</p>}
+                            {errors.toWalletId && <p id="transaction-to-wallet-error" role="alert" className="mt-1 text-sm text-red-600">{errors.toWalletId}</p>}
                         </div>
                     </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Input label="Tanggal" type="date" value={date} onChange={(e) => setDate(e.target.value)} error={errors.date} required />
                     <Input label="Waktu" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
                 </div>
@@ -355,19 +366,19 @@ export default function AddTransactionModal({ isOpen, onClose, editing = null, i
                     onChange={(e) => setNote(e.target.value)}
                 />
 
-                <div className={`flex gap-3 justify-end pt-2 ${editing ? '' : ''}`}>
+                <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
                     {editing && (
                         <Button
                             type="button"
                             variant="outline"
-                            className="px-5 py-2.5 !border-red-300 !text-red-600 hover:!bg-red-50 mr-auto"
-                            onClick={() => { deleteTransaction(editing.id); onClose(); }}
+                            className="w-full px-5 py-2.5 !border-red-300 !text-red-600 hover:!bg-red-50 sm:mr-auto sm:w-auto"
+                            onClick={() => onRequestDelete?.(editing)}
                         >
                             Hapus
                         </Button>
                     )}
-                    <Button type="button" variant="secondary" onClick={onClose} className="px-5 py-2.5">Batal</Button>
-                    <Button type="submit" variant="primary" className="px-5 py-2.5 bg-emerald-600">
+                    <Button type="button" variant="secondary" onClick={onClose} className="w-full px-5 py-2.5 sm:w-auto">Batal</Button>
+                    <Button type="submit" variant="primary" className="w-full bg-emerald-600 px-5 py-2.5 sm:w-auto">
                         {editing ? 'Simpan Perubahan' : 'Simpan Transaksi'}
                     </Button>
                 </div>

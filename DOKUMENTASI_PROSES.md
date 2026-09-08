@@ -1,6 +1,6 @@
-# Dokumentasi Proses & Langkah Kerja SakuPintar 🚀
+# Dokumentasi Proses & Langkah Kerja Sakuta 🚀
 
-Dokumen ini berisi rangkuman seluruh perubahan sistem yang telah diimplementasikan pada proyek **SakuPintar** serta panduan langkah demi langkah untuk melakukan deploy dan aktivasi produksi di cloud.
+Dokumen ini berisi rangkuman seluruh perubahan sistem yang telah diimplementasikan pada proyek **Sakuta** serta panduan langkah demi langkah untuk melakukan deploy dan aktivasi produksi di cloud.
 
 ---
 
@@ -35,13 +35,13 @@ Dokumen ini berisi rangkuman seluruh perubahan sistem yang telah diimplementasik
 
 ## 2. Langkah Kerja Selanjutnya (Next Steps & Deploy Guide)
 
-Agar aplikasi SakuPintar ini dapat diakses secara online oleh Anda dan pacar Anda secara bersamaan melalui HP atau laptop masing-masing, ikuti panduan ini:
+Agar aplikasi Sakuta ini dapat diakses secara online oleh Anda dan pacar Anda secara bersamaan melalui HP atau laptop masing-masing, ikuti panduan ini:
 
 ### 📍 Langkah 1: Deploy Aplikasi Frontend ke Vercel (2 Menit)
 Karena kode lokal Anda sudah 100% tersinkronisasi di GitHub remote, Anda tinggal melakukan deploy gratis ke Vercel:
 1. Masuk ke **[Vercel](https://vercel.com/)** menggunakan akun GitHub Anda.
 2. Klik tombol **"Add New"** -> **"Project"**.
-3. Klik **"Import"** pada repositori bernama **`SakuPintar`**.
+3. Klik **"Import"** pada repositori project aplikasi Anda.
 4. Cari bagian **Environment Variables** sebelum klik deploy, lalu masukkan kredensial Supabase Anda dari file `.env`:
    * **Key**: `VITE_SUPABASE_URL` | **Value**: *(Salin URL Supabase Anda)*
    * **Key**: `VITE_SUPABASE_ANON_KEY` | **Value**: *(Salin Anon Key Supabase Anda)*
@@ -63,7 +63,7 @@ Agar proses login Google OAuth dan verifikasi token berjalan lancar di website p
 
 ### 📍 Langkah 3: Daftarkan Domain Vercel di Google Cloud Console (1 Menit)
 Agar Google mengizinkan pengalihan masuk ke domain Vercel Anda:
-1. Buka kembali proyek **SakuPintar** Anda di **[Google Cloud Credentials](https://console.cloud.google.com/apis/credentials)**.
+1. Buka kembali proyek **Sakuta** Anda di **[Google Cloud Credentials](https://console.cloud.google.com/apis/credentials)**.
 2. Klik ikon pensil (Edit) pada bagian **OAuth 2.0 Client IDs** -> **Web client 1**.
 3. Cari kolom **Authorized redirect URIs**.
 4. Salin alamat callback URL Supabase produksi Anda dari kolom Google Provider di Supabase. Alamatnya sama dengan yang telah Anda salin sebelumnya:
