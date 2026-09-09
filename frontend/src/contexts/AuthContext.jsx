@@ -22,6 +22,7 @@ const OAUTH_CALLBACK_KEYS = [
 ];
 
 const hashPass = (s) => btoa(unescape(encodeURIComponent(`sp::${s}`))).split('').reverse().join('');
+const localUserId = (email) => `local-${encodeURIComponent(String(email || '').trim().toLowerCase())}`;
 
 const toAppUser = (session) => {
     const sessionUser = session?.user;
@@ -42,6 +43,27 @@ export function hasOAuthCallbackParams() {
     return ['access_token', 'refresh_token', 'code', 'error', 'error_code', 'error_description']
         .some((key) => hashParams.has(key) || searchParams.has(key));
 }
+
+const maskUserId = (userId) => {
+    const value = String(userId || '');
+    if (!value) return undefined;
+    if (value.length <= 8) return 'present';
+    return `${value.slice(0, 4)}...${value.slice(-4)}`;
+};
+
+const logAuthDiagnostic = ({ event, sessionExists, userId, authLoading, redirectDecision }) => {
+    if (typeof window === 'undefined') return;
+
+    console.info('[Sakuta auth]', {
+        event,
+        sessionExists: Boolean(sessionExists),
+        ...(userId ? { userId: maskUserId(userId) } : {}),
+        pathname: window.location.pathname,
+        callbackParamsDetected: hasOAuthCallbackParams(),
+        authLoading,
+        redirectDecision
+    });
+};
 
 const getOAuthCallbackError = () => {
     if (typeof window === 'undefined') return '';
@@ -91,9 +113,9 @@ const loadUsers = () => {
         const arr = raw ? JSON.parse(raw) : null;
         if (Array.isArray(arr) && arr.length > 0) return arr;
     } catch (e) {
-        console.warn('Sakuta: gagal membaca data pengguna.', e);
+        console.warn('Sakuta: gagal membaca data pengguna.');
     }
-    const seeded = [{ name: 'Demo User', email: DEMO_EMAIL, passHash: hashPass(DEMO_PASS) }];
+    const seeded = [{ id: localUserId(DEMO_EMAIL), name: 'Demo User', email: DEMO_EMAIL, passHash: hashPass(DEMO_PASS) }];
     try {
         localStorage.setItem(USERS_KEY, JSON.stringify(seeded));
     } catch (e) {}
@@ -104,7 +126,12 @@ const loadSession = () => {
     try {
         const raw = localStorage.getItem(SESSION_KEY);
         const s = raw ? JSON.parse(raw) : null;
-        if (s && s.name && s.email) return s;
+        if (s && s.name && s.email) {
+            return {
+                ...s,
+                id: s.id && s.id !== 'local-user' ? s.id : localUserId(s.email),
+            };
+        }
     } catch (e) {}
     return null;
 };
@@ -117,13 +144,28 @@ export function AuthProvider({ children }) {
     // Sync Auth Session
     useEffect(() => {
         if (!isSupabaseConfigured) {
+            logAuthDiagnostic({
+                event: 'AUTH_INIT_START',
+                sessionExists: false,
+                authLoading: true,
+                redirectDecision: 'localstorage_fallback'
+            });
             clearOAuthCallbackParams();
-            setUser(loadSession());
+            const localSession = loadSession();
+            setUser(localSession);
             setAuthLoading(false);
+            logAuthDiagnostic({
+                event: 'AUTH_READY',
+                sessionExists: Boolean(localSession),
+                userId: localSession?.id,
+                authLoading: false,
+                redirectDecision: 'localstorage_fallback'
+            });
             return;
         }
 
         let mounted = true;
+        let authReady = false;
         let initialSessionReceived = false;
         let latestSession = null;
         let resolveInitialSession;
@@ -131,9 +173,23 @@ export function AuthProvider({ children }) {
             resolveInitialSession = resolve;
         });
 
+        logAuthDiagnostic({
+            event: 'AUTH_INIT_START',
+            sessionExists: false,
+            authLoading: true,
+            redirectDecision: 'supabase_session_restore'
+        });
+
         // Register before reading the session so an OAuth callback cannot be missed.
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             latestSession = session;
+            logAuthDiagnostic({
+                event,
+                sessionExists: Boolean(session),
+                userId: session?.user?.id,
+                authLoading: !authReady,
+                redirectDecision: 'auth_state_received'
+            });
             if (event === 'INITIAL_SESSION' && !initialSessionReceived) {
                 initialSessionReceived = true;
                 resolveInitialSession(session);
@@ -146,6 +202,12 @@ export function AuthProvider({ children }) {
         // Wait for both SDK initialization and its initial state event before routing.
         const restoreSession = async () => {
             try {
+                logAuthDiagnostic({
+                    event: 'GET_SESSION_START',
+                    sessionExists: false,
+                    authLoading: !authReady,
+                    redirectDecision: 'await_supabase'
+                });
                 const { error } = await supabase.auth.getSession();
                 if (error) throw error;
                 await initialSessionPromise;
@@ -156,17 +218,39 @@ export function AuthProvider({ children }) {
                 clearOAuthCallbackParams();
                 setUser(toAppUser(session));
                 if (callbackError) setAuthError(callbackError);
+                authReady = true;
                 setAuthLoading(false);
+                logAuthDiagnostic({
+                    event: 'AUTH_READY',
+                    sessionExists: Boolean(session),
+                    userId: session?.user?.id,
+                    authLoading: false,
+                    redirectDecision: 'route_pending'
+                });
             } catch (e) {
                 if (!mounted) return;
                 await initialSessionPromise;
                 if (!mounted) return;
-                console.error('Sakuta: gagal membaca sesi dari Supabase.', e);
+                logAuthDiagnostic({
+                    event: 'AUTH_INIT_ERROR',
+                    sessionExists: Boolean(latestSession),
+                    userId: latestSession?.user?.id,
+                    authLoading: true,
+                    redirectDecision: 'auth_restore_failed'
+                });
                 const callbackError = getOAuthCallbackError();
                 clearOAuthCallbackParams();
                 setUser(toAppUser(latestSession));
                 setAuthError(callbackError || e?.message || 'Sesi OAuth tidak dapat dipulihkan. Silakan coba lagi.');
+                authReady = true;
                 setAuthLoading(false);
+                logAuthDiagnostic({
+                    event: 'AUTH_READY',
+                    sessionExists: Boolean(latestSession),
+                    userId: latestSession?.user?.id,
+                    authLoading: false,
+                    redirectDecision: 'route_pending'
+                });
             }
         };
 
@@ -189,7 +273,7 @@ export function AuthProvider({ children }) {
             const found = users.find((u) => u.email.toLowerCase() === em);
             if (!found) return { ok: false, error: 'Akun dengan email tersebut tidak ditemukan.' };
             if (found.passHash !== hashPass(password)) return { ok: false, error: 'Kata sandi salah. Coba lagi.' };
-            const session = { name: found.name, email: found.email, id: 'local-user' };
+            const session = { name: found.name, email: found.email, id: found.id || localUserId(found.email) };
             localStorage.setItem(SESSION_KEY, JSON.stringify(session));
             setUser(session);
             return { ok: true };
@@ -223,9 +307,9 @@ export function AuthProvider({ children }) {
             if (users.some((u) => u.email.toLowerCase() === em)) {
                 return { ok: false, error: 'Email sudah terdaftar. Gunakan email lain atau masuk.' };
             }
-            users.push({ name: nm, email: em, passHash: hashPass(password) });
+            users.push({ id: localUserId(em), name: nm, email: em, passHash: hashPass(password) });
             localStorage.setItem(USERS_KEY, JSON.stringify(users));
-            const session = { name: nm, email: em, id: 'local-user' };
+            const session = { name: nm, email: em, id: localUserId(em) };
             localStorage.setItem(SESSION_KEY, JSON.stringify(session));
             setUser(session);
             return { ok: true };
@@ -251,35 +335,79 @@ export function AuthProvider({ children }) {
     const loginWithGoogle = useCallback(async () => {
         setAuthError('');
         if (!isSupabaseConfigured) {
-            const session = { name: 'Demo User', email: DEMO_EMAIL, id: 'local-user' };
+            const session = { name: 'Demo User', email: DEMO_EMAIL, id: localUserId(DEMO_EMAIL) };
             localStorage.setItem(SESSION_KEY, JSON.stringify(session));
             setUser(session);
             return { ok: true };
         }
 
+        const redirectTo = window.location.origin + '/dashboard';
+        logAuthDiagnostic({
+            event: 'OAUTH_START',
+            sessionExists: false,
+            authLoading: false,
+            redirectDecision: 'oauth_redirect_dashboard'
+        });
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: window.location.origin + '/dashboard'
+                redirectTo
             }
         });
 
         if (error) {
+            logAuthDiagnostic({
+                event: 'OAUTH_START_ERROR',
+                sessionExists: false,
+                authLoading: false,
+                redirectDecision: 'stay_on_login'
+            });
             return { ok: false, error: error.message };
         }
+
+        logAuthDiagnostic({
+            event: 'OAUTH_REDIRECT_STARTED',
+            sessionExists: false,
+            authLoading: false,
+            redirectDecision: 'oauth_redirect_dashboard'
+        });
 
         return { ok: true };
     }, []);
 
     const logout = useCallback(async () => {
+        logAuthDiagnostic({
+            event: 'SIGN_OUT_REQUESTED',
+            sessionExists: true,
+            authLoading: false,
+            redirectDecision: 'logout'
+        });
         if (!isSupabaseConfigured) {
             localStorage.removeItem(SESSION_KEY);
             setUser(null);
-            return;
+            logAuthDiagnostic({
+                event: 'SIGN_OUT_COMPLETED',
+                sessionExists: false,
+                authLoading: false,
+                redirectDecision: 'redirect_login'
+            });
+            return { ok: true };
         }
 
-        await supabase.auth.signOut();
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+            setAuthError(error.message);
+            console.error('Sakuta: gagal keluar dari Supabase.', error);
+            return { ok: false, error: error.message };
+        }
         setUser(null);
+        logAuthDiagnostic({
+            event: 'SIGN_OUT_COMPLETED',
+            sessionExists: false,
+            authLoading: false,
+            redirectDecision: 'redirect_login'
+        });
+        return { ok: true };
     }, []);
 
     const value = useMemo(() => ({

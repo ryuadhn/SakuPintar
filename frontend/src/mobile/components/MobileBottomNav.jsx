@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Plus, Settings2, UserRound, Wallet } from 'lucide-react';
+import { BarChart3, Home, Plus, UserRound, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const baseItemClass = 'mobile-bottom-nav-item flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] font-medium transition-colors';
@@ -7,9 +7,7 @@ const baseItemClass = 'mobile-bottom-nav-item flex min-w-0 flex-1 flex-col items
 export default function MobileBottomNav({
     activePath,
     onAddTransaction,
-    onOpenMenu,
     onOpenAccount,
-    menuOpen = false,
     accountOpen = false,
 }) {
     const linkClass = (path) => `${baseItemClass} ${activePath === path ? 'is-active' : ''}`;
@@ -37,16 +35,10 @@ export default function MobileBottomNav({
                 </Link>
             )}
 
-            <button
-                type="button"
-                onClick={onOpenMenu}
-                aria-expanded={menuOpen}
-                aria-controls="mobile-navigation-drawer"
-                className={`${baseItemClass} ${menuOpen ? 'is-active' : ''}`}
-            >
-                <Settings2 className="h-[18px] w-[18px]" aria-hidden="true" />
-                <span>Pengaturan</span>
-            </button>
+            <Link to="/reports" aria-current={activePath === '/reports' ? 'page' : undefined} className={linkClass('/reports')}>
+                <BarChart3 className="h-[18px] w-[18px]" aria-hidden="true" />
+                <span>Laporan</span>
+            </Link>
             <button
                 type="button"
                 onClick={onOpenAccount}

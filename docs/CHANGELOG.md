@@ -48,7 +48,7 @@ Sakuta berkembang dari UI statis (data hardcoded) menjadi aplikasi pencatat keua
 **Penjelasan:**
 - Semua data (dompet, kategori, transaksi, anggaran, aturan rutin, target tabungan) kelasih dalam satu store global dan **tersimpan otomatis ke `localStorage`** — data tidak hilang saat browser ditutup
 - Saldo tiap dompet dihitung riil dari transaksi (pemasukan − pengeluaran ± transfer)
-- Tombol **Reset Data** di sidebar mengembalikan semua data ke contoh awal
+- Tombol **Reset Data** di sidebar mengosongkan semua data finance akun aktif tanpa menghapus akun auth
 
 ---
 

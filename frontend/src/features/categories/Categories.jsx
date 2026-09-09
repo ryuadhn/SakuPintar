@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Utensils, Car, ShoppingBag, Clapperboard, FileText, HeartPulse, Wallet, Banknote, Plus, Receipt, Tags } from 'lucide-react';
+import { Banknote, Plus, Receipt, Tags, Wallet } from 'lucide-react';
 import AuthenticatedLayout from '../../layouts/AuthenticatedLayout';
 import CategoryCard from './components/CategoryCard';
 import CategoryModal from './components/CategoryModal';
@@ -8,15 +8,7 @@ import BudgetAlertBanner from '../../components/shared/BudgetAlertBanner';
 import Button from '../../components/ui/Button';
 import { useFinance } from '../../contexts/FinanceContext';
 import { fmtIDR } from '../../utils/format';
-
-const ICON_BY_ID = {
-    food: Utensils,
-    transport: Car,
-    lifestyle: Clapperboard,
-    shopping: ShoppingBag,
-    bills: FileText,
-    health: HeartPulse,
-};
+import { getCategoryIcon } from './categoryIconOptions';
 
 const COLOR_BY_ID = {
     food: 'amber',
@@ -113,7 +105,7 @@ export default function Categories() {
                             count={getCategoryMonthCount(cat.id)}
                             spent={getCategoryMonthSpend(cat.id)}
                             limit={budgets[cat.id] || null}
-                            icon={ICON_BY_ID[cat.id] || Wallet}
+                            icon={getCategoryIcon(cat)}
                             colorClass={COLOR_BY_ID[cat.id] || 'emerald'}
                             onEdit={() => openEdit(cat)}
                         />
@@ -140,14 +132,20 @@ export default function Categories() {
                         </h3>
                         <div className="categories-income-list flex flex-wrap gap-3 min-w-0">
                             {incomeCategories.map((cat) => (
-                                <button
-                                    key={cat.id}
-                                    type="button"
-                                    onClick={() => openEdit(cat)}
-                                    className={`categories-income-chip ui-badge rounded-full transition-colors ${cat.badge}`}
-                                >
-                                    {cat.name}
-                                </button>
+                                (() => {
+                                    const Icon = getCategoryIcon(cat);
+                                    return (
+                                        <button
+                                            key={cat.id}
+                                            type="button"
+                                            onClick={() => openEdit(cat)}
+                                            className={`categories-income-chip ui-badge inline-flex items-center gap-1.5 rounded-full transition-colors ${cat.badge}`}
+                                        >
+                                            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                                            {cat.name}
+                                        </button>
+                                    );
+                                })()
                             ))}
                         </div>
                     </div>

@@ -27,3 +27,5 @@ build/
 .env.test
 .env.*
 !.env.example
+
+.vercel

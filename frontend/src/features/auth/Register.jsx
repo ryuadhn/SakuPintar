@@ -13,10 +13,14 @@ const baseInputWrapperClass =
 const baseInputClass =
   "ui-auth-input";
 
+const PASSWORD_MISMATCH_ERROR =
+  "Kata sandi dan konfirmasi kata sandi tidak cocok!";
+
 function TextField({
   id,
   label,
   type = "text",
+  inputMode,
   placeholder,
   value,
   onChange,
@@ -28,9 +32,9 @@ function TextField({
       <label className={baseFieldLabelClass} htmlFor={id}>
         {label}
       </label>
-      <div className={`${baseInputWrapperClass} pl-12 pr-4`}>
+      <div className={`${baseInputWrapperClass} ui-auth-input-leading`}>
         {/* Left Icon - User or Envelope */}
-        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" aria-hidden="true">
+        <span className="ui-auth-input-icon" aria-hidden="true">
           {label === "Email" ? (
             <Mail className="h-4 w-5" strokeWidth={1.8} />
           ) : (
@@ -41,6 +45,7 @@ function TextField({
           id={id}
           name={name}
           type={type}
+          inputMode={inputMode}
           placeholder={placeholder}
           autoComplete={autoComplete}
           value={value}
@@ -61,6 +66,8 @@ function PasswordField({
   onChange,
   autoComplete,
   name,
+  ariaInvalid,
+  ariaDescribedBy,
 }) {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -69,9 +76,9 @@ function PasswordField({
       <label className={baseFieldLabelClass} htmlFor={id}>
         {label}
       </label>
-      <div className={`${baseInputWrapperClass} pl-12 pr-14`}>
+      <div className={`${baseInputWrapperClass} ui-auth-input-leading ui-auth-input-password`}>
         {/* Left Lock Icon */}
-        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" aria-hidden="true">
+        <span className="ui-auth-input-icon" aria-hidden="true">
           <LockKeyhole className="h-5 w-4" strokeWidth={1.8} />
         </span>
         <input
@@ -82,6 +89,8 @@ function PasswordField({
           autoComplete={autoComplete}
           value={value}
           onChange={onChange}
+          aria-invalid={ariaInvalid || undefined}
+          aria-describedby={ariaDescribedBy}
           className={baseInputClass}
           required
         />
@@ -139,7 +148,7 @@ export default function Register() {
       return;
     }
     if (password !== confirmPassword) {
-      setError("Kata sandi dan konfirmasi kata sandi tidak cocok!");
+      setError(PASSWORD_MISMATCH_ERROR);
       return;
     }
     setError("");
@@ -176,6 +185,8 @@ export default function Register() {
               className="ui-auth-brand-mark"
               alt="Logo Sakuta"
               src={icon}
+              width="48"
+              height="48"
               draggable={false}
             />
             <span className="ui-auth-brand-name">Sakuta</span>
@@ -192,7 +203,11 @@ export default function Register() {
           </div>
         )}
 
-        <form className="ui-auth-form" onSubmit={handleSubmit}>
+        <form
+          className="ui-auth-form"
+          onSubmit={handleSubmit}
+          aria-describedby={error ? `${formId}-error` : undefined}
+        >
           <TextField
             id={fullNameId}
             name="name"
@@ -209,6 +224,7 @@ export default function Register() {
             name="email"
             label="Email"
             type="email"
+            inputMode="email"
             placeholder="contoh@email.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -222,7 +238,13 @@ export default function Register() {
             label="Kata Sandi"
             placeholder="Min. 8 karakter"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              const nextPassword = e.target.value;
+              setPassword(nextPassword);
+              if (error === PASSWORD_MISMATCH_ERROR && nextPassword === confirmPassword) {
+                setError("");
+              }
+            }}
             autoComplete="new-password"
           />
 
@@ -233,14 +255,23 @@ export default function Register() {
             label="Konfirmasi Kata Sandi"
             placeholder="Ulangi kata sandi"
             value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            onChange={(e) => {
+              const nextConfirmPassword = e.target.value;
+              setConfirmPassword(nextConfirmPassword);
+              if (error === PASSWORD_MISMATCH_ERROR && nextConfirmPassword === password) {
+                setError("");
+              }
+            }}
             autoComplete="new-password"
+            ariaInvalid={error === PASSWORD_MISMATCH_ERROR}
+            ariaDescribedBy={error === PASSWORD_MISMATCH_ERROR ? `${formId}-error` : undefined}
           />
 
           <button
             type="submit"
             disabled={loading}
             className="ui-auth-submit"
+            aria-busy={loading}
           >
             {loading ? "Mendaftarkan..." : "Daftar Sekarang"}
           </button>
@@ -256,7 +287,7 @@ export default function Register() {
             onClick={handleGoogleLogin}
             title="Daftar dengan akun Google"
             className="ui-auth-social"
-            aria-label="Continue with Google"
+            aria-label="Daftar dengan Google"
           >
             <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
               <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.47 14.98 1 12 1 7.35 1 3.37 3.65 1.4 7.56l3.85 2.99c.9-2.7 3.42-4.51 6.75-4.51z" />

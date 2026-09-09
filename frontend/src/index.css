@@ -55,6 +55,10 @@
   --ui-duration-slow: 320ms;
   --ui-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ui-stagger-step: 45ms;
+  --ui-auth-card-max: 30rem;
+  --ui-auth-card-padding: 2rem;
+  --ui-auth-mark-size: 3rem;
+  --ui-auth-control-height: 3rem;
 }
 
 @tailwind base;
@@ -1214,12 +1218,14 @@
 .ui-auth-shell {
   position: relative;
   display: flex;
-  min-height: 100svh;
+  min-height: 100dvh;
   width: 100%;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  overflow: hidden;
-  padding: var(--ui-space-6) var(--ui-space-4);
+  overflow-x: hidden;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: max(var(--ui-space-6), env(safe-area-inset-top)) max(var(--ui-space-4), env(safe-area-inset-right)) max(var(--ui-space-6), env(safe-area-inset-bottom)) max(var(--ui-space-4), env(safe-area-inset-left));
   background: var(--ui-page);
 }
 
@@ -1228,10 +1234,14 @@
   z-index: 1;
   display: flex;
   width: 100%;
-  max-width: 30rem;
+  max-width: var(--ui-auth-card-max);
   flex-direction: column;
   gap: var(--ui-space-6);
-  padding: var(--ui-space-8);
+  min-width: 0;
+  box-sizing: border-box;
+  margin-block: auto;
+  margin-inline: auto;
+  padding: var(--ui-auth-card-padding);
   border: 1px solid var(--ui-line);
   border-radius: var(--ui-radius-card);
   background: var(--ui-surface);
@@ -1255,13 +1265,33 @@
 .ui-auth-input-wrap {
   position: relative;
   display: flex;
-  min-height: 3rem;
+  min-height: var(--ui-auth-control-height);
   align-items: center;
   width: 100%;
   border: 1px solid var(--ui-line);
   border-radius: var(--ui-radius-control);
   background: var(--ui-surface-subtle);
   transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.ui-auth-input-leading {
+  padding-inline-start: 3rem;
+  padding-inline-end: 1rem;
+}
+
+.ui-auth-input-password {
+  padding-inline-end: 3.5rem;
+}
+
+.ui-auth-input-icon {
+  position: absolute;
+  inset-inline-start: 1rem;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ui-ink-muted);
+  transform: translateY(-50%);
 }
 
 .ui-auth-input-wrap:focus-within {
@@ -1281,7 +1311,7 @@
 }
 
 .ui-auth-input::placeholder {
-  color: var(--ui-ink-muted);
+  color: var(--ui-ink-secondary);
 }
 
 .ui-auth-password-toggle {
@@ -1304,9 +1334,19 @@
   background: var(--ui-brand-soft);
 }
 
+.ui-auth-password-toggle:focus-visible,
+.ui-auth-submit:focus-visible,
+.ui-auth-social:focus-visible,
+.ui-auth-demo-link:focus-visible,
+.ui-auth-brand:focus-visible,
+.ui-auth-link:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 3px;
+}
+
 .ui-auth-submit {
   display: inline-flex;
-  min-height: 3rem;
+  min-height: var(--ui-auth-control-height);
   align-items: center;
   justify-content: center;
   width: 100%;
@@ -1330,6 +1370,20 @@
 .ui-auth-submit:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.ui-auth-demo-link {
+  align-self: center;
+  min-height: 2.75rem;
+  padding-inline: var(--ui-space-2);
+  color: var(--ui-brand);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.ui-auth-demo-link:hover {
+  text-decoration: underline;
 }
 
 .ui-auth-social {
@@ -1361,6 +1415,156 @@
   color: var(--ui-danger);
   font-size: 0.75rem;
   line-height: 1.45;
+}
+
+/* Register page: keep the long onboarding form calm and readable on small screens. */
+.ui-auth-register {
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: clamp(var(--ui-space-4), 4vw, 2.5rem);
+}
+
+.ui-auth-register .ui-auth-card {
+  width: min(100%, var(--ui-auth-card-max));
+  gap: var(--ui-space-5);
+}
+
+.ui-auth-header {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ui-space-4);
+  text-align: center;
+}
+
+.ui-auth-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  color: var(--ui-brand);
+  text-decoration: none;
+}
+
+.ui-auth-brand-mark {
+  display: block;
+  width: var(--ui-auth-mark-size);
+  height: var(--ui-auth-mark-size);
+  max-width: var(--ui-auth-mark-size);
+  flex-shrink: 0;
+  border-radius: 0.75rem;
+  object-fit: contain;
+  /* The colored artwork sits slightly right inside the otherwise centered viewBox. */
+  transform: translateX(-1px);
+}
+
+.ui-auth-brand-name {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.ui-auth-intro {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+
+.ui-auth-title {
+  margin: 0;
+  color: var(--ui-ink);
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.ui-auth-subtitle {
+  margin: 0;
+  color: var(--ui-ink-secondary);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.ui-auth-form {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--ui-space-4);
+}
+
+.ui-auth-input {
+  align-self: stretch;
+  padding-block: var(--ui-space-2);
+}
+
+.ui-auth-divider {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  color: var(--ui-ink-secondary);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.ui-auth-divider::before {
+  position: absolute;
+  inset-inline: 0;
+  height: 1px;
+  background: var(--ui-line-strong);
+  content: '';
+}
+
+.ui-auth-divider span {
+  position: relative;
+  padding-inline: var(--ui-space-3);
+  background: var(--ui-surface);
+}
+
+.ui-auth-social-row {
+  display: flex;
+  width: 100%;
+}
+
+.ui-auth-social {
+  width: 100%;
+  padding-inline: var(--ui-space-4);
+}
+
+.ui-auth-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-1);
+  color: var(--ui-ink-secondary);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.ui-auth-footer p {
+  margin: 0;
+}
+
+.ui-auth-link {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  padding-inline: var(--ui-space-2);
+  color: var(--ui-brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ui-auth-link:hover {
+  text-decoration: underline;
 }
 
 /* Existing utility surfaces now resolve to the same system on authenticated pages. */
@@ -1754,7 +1958,7 @@
   }
 
   .ui-auth-card {
-    padding: var(--ui-space-6);
+    padding: var(--ui-space-5);
   }
 
   .app-page-header {
@@ -2220,6 +2424,49 @@
     overflow-x: hidden;
     overflow-y: auto;
     padding-bottom: max(var(--ui-space-6), env(safe-area-inset-bottom));
+  }
+
+  .ui-auth-register {
+    align-items: flex-start;
+    padding: var(--ui-space-4);
+  }
+
+  .ui-auth-register .ui-auth-card {
+    margin-block: 0;
+    padding: var(--ui-space-5) var(--ui-space-4);
+    gap: var(--ui-space-4);
+  }
+
+  .ui-auth-register .ui-auth-brand-mark {
+    width: 2.75rem;
+    height: 2.75rem;
+    max-width: 2.75rem;
+  }
+
+  .ui-auth-register .ui-auth-brand-name {
+    font-size: 1.375rem;
+  }
+
+  .ui-auth-register .ui-auth-title {
+    font-size: 1.5rem;
+  }
+
+  .ui-auth-register .ui-auth-form {
+    gap: var(--ui-space-3);
+  }
+
+  .ui-auth-register .ui-auth-field {
+    gap: var(--ui-space-1);
+  }
+
+  .ui-auth-register .ui-auth-input-wrap,
+  .ui-auth-register .ui-auth-submit,
+  .ui-auth-register .ui-auth-social {
+    min-height: 2.75rem;
+  }
+
+  .ui-auth-register .ui-auth-input {
+    padding-block: var(--ui-space-2);
   }
 
   .ui-auth-card {

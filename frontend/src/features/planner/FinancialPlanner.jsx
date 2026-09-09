@@ -38,10 +38,10 @@ export default function FinancialPlanner() {
     const hasCashflowData = hasIncomeData && hasExpenseData;
 
     // ─── Input States ───
-    const [targetTitle, setTargetTitle] = useState('Dana Darurat Mandiri');
-    const [targetAmount, setTargetAmount] = useState(100000000);
+    const [targetTitle, setTargetTitle] = useState('');
+    const [targetAmount, setTargetAmount] = useState(0);
     const [years, setYears] = useState(5);
-    const [initialSavings, setInitialSavings] = useState(10000000);
+    const [initialSavings, setInitialSavings] = useState(0);
     const [inflationRate, setInflationRate] = useState(4); // 4% default inflation in ID
     const [returnRate, setReturnRate] = useState(7); // 7% default return
 

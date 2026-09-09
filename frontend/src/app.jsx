@@ -21,42 +21,118 @@ import Tasks from './features/tasks/Tasks';
 
 registerSW({ immediate: true });
 
+function logAuthRouteDecision(event, { user, authLoading, callbackParamsDetected, redirectDecision }) {
+  if (typeof window === 'undefined') return;
+
+  console.info('[Sakuta auth]', {
+    event,
+    sessionExists: Boolean(user),
+    pathname: window.location.pathname,
+    callbackParamsDetected,
+    authLoading,
+    redirectDecision
+  });
+}
+
 function ProtectedRoute({ children }) {
   const { user, authLoading } = useAuth();
-  if (authLoading || hasOAuthCallbackParams()) {
+  const callbackParamsDetected = hasOAuthCallbackParams();
+  if (authLoading || callbackParamsDetected) {
+    logAuthRouteDecision('PROTECTED_ROUTE_WAIT', {
+      user,
+      authLoading,
+      callbackParamsDetected,
+      redirectDecision: 'wait_for_auth'
+    });
     return (
       <div className="app-shell h-screen w-screen flex justify-center items-center">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#0e6c4a] border-t-transparent"></div>
       </div>
     );
   }
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    logAuthRouteDecision('PROTECTED_ROUTE_REDIRECT_LOGIN', {
+      user,
+      authLoading,
+      callbackParamsDetected,
+      redirectDecision: 'redirect_login'
+    });
+    return <Navigate to="/login" replace />;
+  }
+  logAuthRouteDecision('PROTECTED_ROUTE_ALLOW', {
+    user,
+    authLoading,
+    callbackParamsDetected,
+    redirectDecision: 'allow_dashboard'
+  });
   return children;
 }
 
 function GuestRoute({ children }) {
   const { user, authLoading } = useAuth();
-  if (authLoading || hasOAuthCallbackParams()) {
+  const callbackParamsDetected = hasOAuthCallbackParams();
+  if (authLoading || callbackParamsDetected) {
+    logAuthRouteDecision('GUEST_ROUTE_WAIT', {
+      user,
+      authLoading,
+      callbackParamsDetected,
+      redirectDecision: 'wait_for_auth'
+    });
     return (
       <div className="app-shell h-screen w-screen flex justify-center items-center">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#0e6c4a] border-t-transparent"></div>
       </div>
     );
   }
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) {
+    logAuthRouteDecision('GUEST_ROUTE_REDIRECT_DASHBOARD', {
+      user,
+      authLoading,
+      callbackParamsDetected,
+      redirectDecision: 'redirect_dashboard'
+    });
+    return <Navigate to="/dashboard" replace />;
+  }
+  logAuthRouteDecision('GUEST_ROUTE_ALLOW', {
+    user,
+    authLoading,
+    callbackParamsDetected,
+    redirectDecision: 'allow_login'
+  });
   return children;
 }
 
 function RootRoute() {
   const { user, authLoading } = useAuth();
-  if (authLoading || hasOAuthCallbackParams()) {
+  const callbackParamsDetected = hasOAuthCallbackParams();
+  if (authLoading || callbackParamsDetected) {
+    logAuthRouteDecision('ROOT_ROUTE_WAIT', {
+      user,
+      authLoading,
+      callbackParamsDetected,
+      redirectDecision: 'wait_for_auth'
+    });
     return (
       <div className="app-shell h-screen w-screen flex justify-center items-center">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#0e6c4a] border-t-transparent"></div>
       </div>
     );
   }
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) {
+    logAuthRouteDecision('ROOT_ROUTE_REDIRECT_DASHBOARD', {
+      user,
+      authLoading,
+      callbackParamsDetected,
+      redirectDecision: 'redirect_dashboard'
+    });
+    return <Navigate to="/dashboard" replace />;
+  }
+  logAuthRouteDecision('ROOT_ROUTE_REDIRECT_LOGIN', {
+    user,
+    authLoading,
+    callbackParamsDetected,
+    redirectDecision: 'redirect_login'
+  });
   return <Navigate to="/login" replace />;
 }
 

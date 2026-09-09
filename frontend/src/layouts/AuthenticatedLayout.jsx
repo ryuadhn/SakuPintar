@@ -543,9 +543,7 @@ export default function AuthenticatedLayout({ children, onAddTransaction }) {
                 <MobileBottomNav
                     activePath={location.pathname}
                     onAddTransaction={onAddTransaction}
-                    onOpenMenu={toggleMobileMenu}
                     onOpenAccount={openMobileAccount}
-                    menuOpen={mobileMenuOpen}
                     accountOpen={mobileAccountOpen}
                 />
 
