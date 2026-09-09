@@ -482,7 +482,10 @@ export function FinanceProvider({ children }) {
                 setState(processed.state);
                 setStateUserId(userId);
                 try {
-                    await runRemoteMutation(() => persistRecurringChanges(userId, processed), true);
+                    await runRemoteMutation(
+                        () => persistRecurringChanges(userId, processed),
+                        resetRecoveryUserIdRef.current === userId,
+                    );
                     if (isStale()) return;
                 } catch (error) {
                     try {
@@ -1707,7 +1710,10 @@ export function FinanceProvider({ children }) {
             }
         }
 
-        if (activeUserIdRef.current !== resetUserId || operationEpochRef.current !== resetEpoch) return true;
+        if (activeUserIdRef.current !== resetUserId) return true;
+        // Invalidate every loader that may have started while the reset RPC was in flight.
+        syncRequestRef.current += 1;
+        operationEpochRef.current += 1;
         setState(createFreshFinanceState());
         setStateUserId(resetUserId);
         setSyncLoading(false);
