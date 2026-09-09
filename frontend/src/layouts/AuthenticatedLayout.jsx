@@ -37,7 +37,8 @@ export default function AuthenticatedLayout({ children, onAddTransaction }) {
     const {
         getBudgetAlerts, resetData, recurringRules, savingsGoals,
         transactions, wallets, categories,
-        invitations, acceptSavingsGoalInvitation, rejectSavingsGoalInvitation
+        invitations, acceptSavingsGoalInvitation, rejectSavingsGoalInvitation,
+        calendarError, clearCalendarError, resetBusy, resetError, clearResetError
     } = useFinance();
     const [searchTerm, setSearchTerm] = useState('');
     const [notifOpen, setNotifOpen] = useState(false);
@@ -83,9 +84,9 @@ export default function AuthenticatedLayout({ children, onAddTransaction }) {
         navigate(`/wallets?q=${encodeURIComponent(term)}`);
     };
 
-    const handleLogout = () => {
-        logout();
-        navigate('/login', { replace: true });
+    const handleLogout = async () => {
+        const result = await logout();
+        if (result?.ok) navigate('/login', { replace: true });
     };
 
     // ─── Unified Notification Hub Logic ───
@@ -345,10 +346,12 @@ export default function AuthenticatedLayout({ children, onAddTransaction }) {
                         </button>
                         <button
                             type="button"
-                            aria-label="Kembalikan data transaksi dan target ke contoh awal"
-                            onClick={() => { if (window.confirm('Reset semua data ke contoh awal?')) resetData(); }}
-                             className="ui-button-compact w-9 h-9 lg:w-auto lg:flex-1 flex items-center justify-center gap-1.5 p-2 lg:px-3 lg:py-1.5 rounded-md bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors shrink-0"
-                            title="Kembalikan data transaksi & target ke contoh awal"
+                            aria-label="Hapus semua data finance akun aktif"
+                            onClick={() => { if (!resetBusy && window.confirm('Hapus semua data finance akun ini? Akun auth dan email tidak akan dihapus.')) void resetData(); }}
+                            disabled={resetBusy}
+                            aria-busy={resetBusy}
+                             className="ui-button-compact w-9 h-9 lg:w-auto lg:flex-1 flex items-center justify-center gap-1.5 p-2 lg:px-3 lg:py-1.5 rounded-md bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors shrink-0 disabled:pointer-events-none disabled:opacity-50"
+                            title="Hapus semua data finance akun ini"
                         >
                             <RefreshCw className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             <span className="hidden lg:inline">Reset Data</span>
@@ -525,6 +528,13 @@ export default function AuthenticatedLayout({ children, onAddTransaction }) {
                     </>
                 )}
                 
+                {(resetError || calendarError) && (
+                    <div role="alert" className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800 sm:mx-6 lg:mx-8">
+                        <span>{resetError || calendarError}</span>
+                        <button type="button" onClick={() => { clearResetError(); clearCalendarError(); }} className="shrink-0 text-rose-700 underline underline-offset-2">Tutup</button>
+                    </div>
+                )}
+
                 {/* Content body wrapper */}
                 <main className="app-content flex-1 overflow-y-auto">
                     {children}
@@ -613,13 +623,15 @@ export default function AuthenticatedLayout({ children, onAddTransaction }) {
                             <div className="mobile-account-list">
                                 <button
                                     type="button"
-                                    onClick={() => { if (window.confirm('Reset semua data ke contoh awal?')) resetData(); }}
-                                    className="mobile-account-row mobile-account-row-warning"
+                                     onClick={() => { if (!resetBusy && window.confirm('Hapus semua data finance akun ini? Akun auth dan email tidak akan dihapus.')) void resetData(); }}
+                                     disabled={resetBusy}
+                                     aria-busy={resetBusy}
+                                     className="mobile-account-row mobile-account-row-warning disabled:pointer-events-none disabled:opacity-50"
                                 >
                                     <span className="mobile-account-row-icon" aria-hidden="true">
                                         <RefreshCw className="h-4 w-4" />
                                     </span>
-                                    <span className="mobile-account-row-label">Reset data contoh</span>
+                                    <span className="mobile-account-row-label">Hapus data finance akun ini</span>
                                 </button>
                             </div>
                         </section>

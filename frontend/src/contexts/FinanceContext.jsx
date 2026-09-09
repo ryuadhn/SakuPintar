@@ -1,13 +1,15 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../store/supabaseClient';
 import { useAuth } from './AuthContext';
-import { advanceISO, currentMonthKey, daysAgoISO, dayOfMonthISO, FREQ_LABELS, monthKeyOf, recurringTransactionId, todayISO, uid } from '../utils/format';
+import { DEFAULT_CATEGORIES, createFreshFinanceState, normalizeFinanceState } from './financeState';
+import { advanceISO, currentMonthKey, FREQ_LABELS, monthKeyOf, recurringTransactionId, todayISO, uid } from '../utils/format';
 
 const STORAGE_KEY = 'sakupintar_finance_v1';
 const RECURRING_METADATA_KEY = 'sakupintar_recurring_metadata_v1';
 const CATEGORY_STORAGE_KEY = 'sakupintar_categories_v1';
 const REMINDER_PRIORITIES = new Set(['low', 'medium', 'high']);
 
+const financeStorageKey = (userId) => `${STORAGE_KEY}_${userId}`;
 const categoryStorageKey = (userId) => `${CATEGORY_STORAGE_KEY}_${userId}`;
 
 const readStoredCategories = (userId) => {
@@ -35,156 +37,6 @@ const writeStoredCategories = (userId, categories) => {
 const normalizeReminderPriority = (priority) => (
     REMINDER_PRIORITIES.has(priority) ? priority : null
 );
-
-const CATEGORY_LABELS = {
-    food: 'Makanan & Minuman',
-    transport: 'Transportasi',
-    lifestyle: 'Hiburan',
-};
-
-const seedCategories = [
-    { id: 'food',      name: CATEGORY_LABELS.food,      type: 'expense', color: '#B45309', badge: 'bg-amber-50 text-amber-700 border border-amber-100' },
-    { id: 'transport', name: CATEGORY_LABELS.transport, type: 'expense', color: '#2563EB', badge: 'bg-blue-50 text-blue-700 border border-blue-100' },
-    { id: 'lifestyle', name: CATEGORY_LABELS.lifestyle, type: 'expense', color: '#9333EA', badge: 'bg-purple-50 text-purple-700 border border-purple-100' },
-    { id: 'shopping',  name: 'Belanja',         type: 'expense', color: '#E11D48', badge: 'bg-rose-50 text-rose-700 border border-rose-100' },
-    { id: 'bills',     name: 'Tagihan',         type: 'expense', color: '#57534E', badge: 'bg-stone-100 text-stone-700 border border-stone-200' },
-    { id: 'health',    name: 'Kesehatan',       type: 'expense', color: '#059669', badge: 'bg-emerald-50 text-emerald-700 border border-emerald-100' },
-    { id: 'salary',    name: 'Gaji',            type: 'income',  color: '#0E6C4A', badge: 'bg-emerald-100 text-emerald-800 border border-emerald-200' },
-    { id: 'bonus',     name: 'Bonus & Proyek',  type: 'income',  color: '#0F766E', badge: 'bg-teal-50 text-teal-700 border border-teal-100' },
-    { id: 'other-inc', name: 'Pemasukan Lain',  type: 'income',  color: '#475569', badge: 'bg-slate-100 text-slate-700 border border-slate-200' },
-];
-
-const seedWallets = [
-    { id: 'personal', name: 'Kartu Personal', color: '#0E6C4A', initialBalance: 85000000 },
-    { id: 'bca',      name: 'BCA Digital',   color: '#565E74', initialBalance: 12450000 },
-    { id: 'cash',     name: 'Tunai',         color: '#B45309', initialBalance: 750000 },
-];
-
-const buildSeedTransactions = () => {
-    const d = daysAgoISO;
-    return [
-        { id: uid(), date: d(1),  time: '14:30', title: 'Starbucks Reserve',          note: 'Kopi & snack sore',        categoryId: 'food',      walletId: 'personal', amount: 125000,   type: 'expense' },
-        { id: uid(), date: d(2),  time: '19:45', title: 'Haidilao Hotpot',            note: 'Makan malam keluarga',     categoryId: 'food',      walletId: 'personal', amount: 850000,   type: 'expense' },
-        { id: uid(), date: d(3),  time: '08:10', title: 'Shell Gatot Subroto',        note: 'Bensin V-Power',           categoryId: 'transport', walletId: 'personal', amount: 450000,   type: 'expense' },
-        { id: uid(), date: d(4),  time: '20:05', title: 'Belanja Bulanan Indomaret',  note: 'Kebutuhan rumah',          categoryId: 'shopping',  walletId: 'cash',     amount: 320000,   type: 'expense' },
-        { id: uid(), date: d(5),  time: '10:00', title: 'Konsultasi Dokter Gigi',     note: 'Scaling + tambal',         categoryId: 'health',    walletId: 'bca',      amount: 600000,   type: 'expense' },
-        { id: uid(), date: d(6),  time: '12:00', title: 'Top Up Dompet Utama',        note: 'Persiapan gajian',         fromWalletId: 'bca', toWalletId: 'personal', amount: 2000000, type: 'transfer' },
-        { id: uid(), date: d(7),  time: '09:15', title: 'Proyek Freelance Website',   note: 'Inbound dari Client XYZ',  categoryId: 'bonus',     walletId: 'bca',      amount: 4500000,  type: 'income' },
-        { id: uid(), date: d(8),  time: '18:40', title: 'Tagihan Listrik PLN',        note: 'Token bulanan',            categoryId: 'bills',     walletId: 'bca',      amount: 480000,   type: 'expense' },
-        { id: uid(), date: d(9),  time: '07:55', title: 'Bensin Ojek Online',         note: 'Top up driver',            categoryId: 'transport', walletId: 'cash',     amount: 80000,    type: 'expense' },
-        { id: uid(), date: d(11), time: '13:20', title: 'Baju & Sepatu Sneakers',     note: 'Diskon akhir pekan',       categoryId: 'shopping',  walletId: 'personal', amount: 780000,   type: 'expense' },
-        { id: uid(), date: d(13), time: '16:00', title: 'Vitamin & Suplemen',         note: 'Restock bulanan',          categoryId: 'health',    walletId: 'cash',     amount: 185000,   type: 'expense' },
-        { id: uid(), date: d(15), time: '21:10', title: 'Nonton Bioskop',             note: 'Weekend movie night',      categoryId: 'lifestyle', walletId: 'personal', amount: 250000,   type: 'expense' },
-    ];
-};
-
-const buildSeedSavingsGoals = () => [
-    { 
-        id: uid(), 
-        title: 'Rumah Impian', 
-        iconKey: 'home', 
-        deadlineISO: '2026-12-01', 
-        current: 125000000, 
-        target: 500000000, 
-        monthly: 8500000,
-        history: [
-            { id: uid(), date: '2026-07-15', amount: 125000000, note: 'Pindahan Tabungan Lama' }
-        ]
-    },
-    { 
-        id: uid(), 
-        title: 'Liburan ke Jepang', 
-        iconKey: 'plane', 
-        deadlineISO: '2027-06-01', 
-        current: 20500000, 
-        target: 25000000, 
-        monthly: 1500000,
-        history: [
-            { id: uid(), date: '2026-08-01', amount: 10000000, note: 'Setoran Awal' },
-            { id: uid(), date: '2026-08-10', amount: 5000000, note: 'Bonus Proyek' },
-            { id: uid(), date: '2026-08-15', amount: 5500000, note: 'Setoran Bulanan Agustus' }
-        ]
-    },
-    { 
-        id: uid(), 
-        title: 'Dana Pendidikan', 
-        iconKey: 'gradcap', 
-        deadlineISO: '2028-07-01', 
-        current: 45000000, 
-        target: 300000000, 
-        monthly: 4000000,
-        history: [
-            { id: uid(), date: '2026-07-20', amount: 30000000, note: 'Setoran Awal' },
-            { id: uid(), date: '2026-08-10', amount: 15000000, note: 'Setoran Bulanan Agustus' }
-        ]
-    },
-    { 
-        id: uid(), 
-        title: 'Dana Pensiun', 
-        iconKey: 'piggy', 
-        deadlineISO: '2045-05-01', 
-        current: 720000000, 
-        target: 1500000000, 
-        monthly: 10000000,
-        history: [
-            { id: uid(), date: '2026-01-10', amount: 500000000, note: 'Saldo Awal Rekening Pensiun' },
-            { id: uid(), date: '2026-06-15', amount: 220000000, note: 'Setoran Rutin Semester 1' }
-        ]
-    },
-    { 
-        id: uid(), 
-        title: 'Laptop Baru untuk Kerja', 
-        iconKey: 'laptop', 
-        deadlineISO: '2026-08-01', 
-        current: 25000000, 
-        target: 25000000, 
-        monthly: 2500000,
-        history: [
-            { id: uid(), date: '2026-08-01', amount: 25000000, note: 'Tabungan Terpenuhi' }
-        ]
-    },
-];
-
-const seedBudgets = {
-    food: 2500000,
-    transport: 1200000,
-    lifestyle: 300000,
-    shopping: 1500000,
-    bills: 1500000,
-    health: 1000000,
-};
-
-const buildSeedRules = () => [
-    { id: uid(), title: 'Gaji Bulanan',        type: 'income',  categoryId: 'salary',    walletId: 'bca',      amount: 12500000, frequency: 'monthly', nextDate: dayOfMonthISO(1), active: true },
-    { id: uid(), title: 'Langganan Streaming', type: 'expense', categoryId: 'lifestyle', walletId: 'personal', amount: 186000,   frequency: 'monthly', nextDate: dayOfMonthISO(28), active: true },
-    { id: uid(), title: 'Internet & Wifi',     type: 'expense', categoryId: 'bills',     walletId: 'personal', amount: 350000,   frequency: 'monthly', nextDate: dayOfMonthISO(3), active: true },
-];
-
-const seedState = () => ({
-    wallets: seedWallets.map((w) => ({ ...w })),
-    categories: seedCategories.map((c) => ({ ...c })),
-    transactions: buildSeedTransactions(),
-    budgets: { ...seedBudgets },
-    recurringRules: buildSeedRules(),
-    reminders: [],
-    savingsGoals: buildSeedSavingsGoals(),
-    invitations: [
-        {
-            id: 'mock-inv-1',
-            goalId: 'mock-goal-1',
-            inviterName: 'Kekasih',
-            inviterEmail: 'pasangan@sakupintar.id',
-            inviteeEmail: 'demo@sakupintar.id',
-            goalTitle: 'Dana Pernikahan Bersama',
-            status: 'pending'
-        }
-    ]
-});
-
-const isValidState = (s) =>
-    s && Array.isArray(s.wallets) && Array.isArray(s.categories) &&
-    Array.isArray(s.transactions) && Array.isArray(s.recurringRules) &&
-    typeof s.budgets === 'object';
 
 const readRecurringMetadata = (userId) => {
     if (!userId) return {};
@@ -220,6 +72,19 @@ const removeRecurringMetadata = (userId, ruleId) => {
         localStorage.setItem(RECURRING_METADATA_KEY, JSON.stringify(parsed));
     } catch (error) {
         console.warn('Sakuta: gagal menghapus metadata aturan rutin.', error);
+    }
+};
+
+const clearRecurringMetadata = (userId) => {
+    if (!userId) return;
+    try {
+        const raw = localStorage.getItem(RECURRING_METADATA_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        delete parsed[userId];
+        localStorage.setItem(RECURRING_METADATA_KEY, JSON.stringify(parsed));
+    } catch (error) {
+        console.error('Sakuta: gagal menghapus metadata aturan rutin.', error);
+        throw error;
     }
 };
 
@@ -346,68 +211,156 @@ const nextRecurringDateFromToday = (nextDate, frequency, anchorDay) => {
     return next < today ? today : next;
 };
 
-const loadInitialState = () => {
+const updateSavingsGoalForUser = async (goalId, userId, changes) => {
+    const ownedResponse = await supabase.from('savings_goals')
+        .update(changes)
+        .eq('id', goalId)
+        .eq('user_id', userId)
+        .select('id');
+    if (ownedResponse.error) throw ownedResponse.error;
+    if (ownedResponse.data && ownedResponse.data.length > 0) return ownedResponse.data;
+
+    // Shared goals are authorized by an active membership scoped to this user.
+    const membershipResponse = await supabase.from('savings_goal_collaborators')
+        .select('savings_goal_id')
+        .eq('savings_goal_id', goalId)
+        .eq('user_id', userId)
+        .maybeSingle();
+    if (membershipResponse.error) throw membershipResponse.error;
+    if (!membershipResponse.data) throw new Error('Target tabungan tidak ditemukan atau tidak dapat diakses.');
+
+    const sharedResponse = await supabase.from('savings_goals')
+        .update(changes)
+        .eq('id', goalId)
+        .select('id');
+    if (sharedResponse.error) throw sharedResponse.error;
+    return sharedResponse.data;
+};
+
+const loadInitialState = (userId) => {
+    if (!userId) return createFreshFinanceState();
     try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        // Never reuse the pre-user-scoped finance cache from older builds.
+        localStorage.removeItem(STORAGE_KEY);
+        const raw = localStorage.getItem(financeStorageKey(userId));
         if (raw) {
-            const parsed = JSON.parse(raw);
-            if (isValidState(parsed)) {
-                return {
-                    ...parsed,
-                    categories: parsed.categories.map((category) => ({
-                        ...category,
-                        name: CATEGORY_LABELS[category.id] || category.name,
-                    })),
-                    wallets: parsed.wallets.map((wallet) => ({
-                        ...wallet,
-                        name: wallet.id === 'personal' ? 'Kartu Personal' : wallet.name,
-                    })),
-                    savingsGoals: (Array.isArray(parsed.savingsGoals) ? parsed.savingsGoals : buildSeedSavingsGoals()).map((g) => ({
-                        ...g,
-                        history: Array.isArray(g.history) ? g.history : (g.current > 0 ? [{ id: uid(), date: todayISO(), amount: g.current, note: 'Saldo Awal' }] : [])
-                    })),
-                    reminders: Array.isArray(parsed.reminders) ? parsed.reminders : [],
-                    invitations: Array.isArray(parsed.invitations) ? parsed.invitations : seedState().invitations
-                };
-            }
+            return normalizeFinanceState(JSON.parse(raw));
         }
     } catch (e) {
-            console.warn('Sakuta: gagal membaca data tersimpan.', e);
+        console.warn('Sakuta: gagal membaca data tersimpan.', e);
     }
-    return seedState();
+    return createFreshFinanceState();
 };
 
 export function FinanceProvider({ children }) {
-    const [state, setState] = useState(loadInitialState);
+    const [state, setState] = useState(createFreshFinanceState);
     const { user } = useAuth();
-    const { wallets, categories, transactions, budgets, recurringRules, reminders = [], savingsGoals, invitations = [] } = state;
+    const [stateUserId, setStateUserId] = useState(null);
     const [syncAttempt, setSyncAttempt] = useState(0);
     const [syncLoading, setSyncLoading] = useState(false);
     const [syncError, setSyncError] = useState('');
     const [calendarOperation, setCalendarOperation] = useState(null);
     const [calendarError, setCalendarError] = useState('');
+    const [resetError, setResetError] = useState('');
+    const [resetBusy, setResetBusy] = useState(false);
+    const syncRequestRef = useRef(0);
+    const operationEpochRef = useRef(0);
+    const activeUserIdRef = useRef(null);
+    const resetBusyRef = useRef(false);
+    const resetRecoveryUserIdRef = useRef(null);
+    const pendingMutationsRef = useRef(new Set());
+    activeUserIdRef.current = user?.id || null;
+    const activeUserEmail = user?.email?.trim().toLowerCase() || '';
+    const captureOperation = () => ({ userId: user?.id || null, epoch: operationEpochRef.current });
+    const operationIsCurrent = (operation) => (
+        operation.epoch === operationEpochRef.current && operation.userId === activeUserIdRef.current
+    );
+    const runRemoteMutation = (callback, allowDuringReset = false) => {
+        if (resetBusyRef.current && !allowDuringReset) return false;
+        if (!isSupabaseConfigured || !user) return callback();
+        const token = { promise: null };
+        pendingMutationsRef.current.add(token);
+        const promise = Promise.resolve().then(callback);
+        token.promise = promise;
+        promise.then(
+            () => pendingMutationsRef.current.delete(token),
+            () => pendingMutationsRef.current.delete(token),
+        );
+        return promise;
+    };
+    const waitForRemoteMutations = async () => {
+        while (pendingMutationsRef.current.size > 0) {
+            await Promise.allSettled(
+                [...pendingMutationsRef.current].map(({ promise }) => promise)
+            );
+        }
+    };
+
+    const visibleState = useMemo(
+        () => (user && stateUserId === user.id ? state : createFreshFinanceState()),
+        [state, stateUserId, user]
+    );
+    const { wallets, categories, transactions, budgets, recurringRules, reminders = [], savingsGoals, invitations = [] } = visibleState;
 
     const retrySync = useCallback(() => setSyncAttempt((attempt) => attempt + 1), []);
     const clearCalendarError = useCallback(() => setCalendarError(''), []);
+    const clearResetError = useCallback(() => setResetError(''), []);
+
+    useEffect(() => {
+        setResetError('');
+    }, [user?.id]);
 
     // ─── LocalStorage Fallback Backup ───
     useEffect(() => {
-        if (isSupabaseConfigured && user) return;
+        if (isSupabaseConfigured || !user || stateUserId !== user.id) return;
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            localStorage.setItem(financeStorageKey(user.id), JSON.stringify(state));
         } catch (e) {
             console.warn('Sakuta: gagal menyimpan data.', e);
         }
-    }, [state, user]);
+    }, [state, stateUserId, user]);
 
     // ─── Supabase Data Sync Loader ───
     useEffect(() => {
-        let cancelled = false;
+        if (resetRecoveryUserIdRef.current !== null
+            && resetRecoveryUserIdRef.current !== (user?.id || null)) {
+            resetRecoveryUserIdRef.current = null;
+            resetBusyRef.current = false;
+            setResetBusy(false);
+        }
 
-        if (!isSupabaseConfigured || !user) {
+        const requestId = syncRequestRef.current + 1;
+        syncRequestRef.current = requestId;
+        operationEpochRef.current += 1;
+        let cancelled = false;
+        const isStale = () => cancelled || requestId !== syncRequestRef.current;
+
+        setStateUserId(null);
+        setState(createFreshFinanceState());
+        setSyncError('');
+        setCalendarOperation(null);
+        setCalendarError('');
+
+        if (!user) {
             setSyncLoading(false);
-            setSyncError('');
-            setState(loadInitialState());
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        if (!isSupabaseConfigured) {
+            try {
+                const localState = processRecurring(loadInitialState(user.id)).state;
+                if (!isStale()) {
+                    setState(localState);
+                    setStateUserId(user.id);
+                }
+            } catch (error) {
+                console.error('Sakuta: gagal memuat data lokal.', error);
+                setSyncError('Data lokal tidak dapat dimuat. Coba lagi.');
+            } finally {
+                if (!isStale()) setSyncLoading(false);
+            }
             return () => {
                 cancelled = true;
             };
@@ -416,8 +369,8 @@ export function FinanceProvider({ children }) {
         const fetchSupabaseData = async () => {
             const userId = user.id;
             const recurringMetadata = readRecurringMetadata(userId);
+            let syncSucceeded = false;
             setSyncLoading(true);
-            setSyncError('');
 
             try {
                 const responses = await Promise.all([
@@ -427,36 +380,42 @@ export function FinanceProvider({ children }) {
                     supabase.from('savings_goals').select('*').eq('user_id', userId),
                     supabase.from('recurring_rules').select('*').eq('user_id', userId),
                     supabase.from('reminders').select('*').eq('user_id', userId),
-                    supabase.from('savings_goal_invitations').select('*').eq('invitee_email', user.email.toLowerCase())
+                    supabase.from('savings_goal_invitations').select('*').eq('invitee_email', activeUserEmail),
+                    supabase.from('savings_goal_collaborators').select('savings_goal_id').eq('user_id', userId)
                 ]);
 
                 const responseError = responses.find((response) => response.error)?.error;
                 if (responseError) throw responseError;
-                if (cancelled) return;
+                if (isStale()) return;
 
-                const [walletsResponse, txnsResponse, budgetsResponse, savingsResponse, rulesResponse, remindersResponse, invitationsResponse] = responses;
-                const walletsData = walletsResponse.data;
-                const txnsData = txnsResponse.data;
-                const budgetsData = budgetsResponse.data;
-                const savingsData = savingsResponse.data;
-                const rulesData = rulesResponse.data;
-                const remindersData = remindersResponse.data;
-                const invsData = invitationsResponse.data;
+                const [walletsResponse, txnsResponse, budgetsResponse, savingsResponse, rulesResponse, remindersResponse, invitationsResponse, collaboratorsResponse] = responses;
+                const walletsData = Array.isArray(walletsResponse.data) ? walletsResponse.data : [];
+                const txnsData = Array.isArray(txnsResponse.data) ? txnsResponse.data : [];
+                const budgetsData = Array.isArray(budgetsResponse.data) ? budgetsResponse.data : [];
+                const savingsData = Array.isArray(savingsResponse.data) ? savingsResponse.data : [];
+                const rulesData = Array.isArray(rulesResponse.data) ? rulesResponse.data : [];
+                const remindersData = Array.isArray(remindersResponse.data) ? remindersResponse.data : [];
+                const invsData = Array.isArray(invitationsResponse.data) ? invitationsResponse.data : [];
+                const collaboratorGoalIds = (collaboratorsResponse.data || []).map((item) => item.savings_goal_id);
+                let sharedSavingsData = [];
+                if (collaboratorGoalIds.length > 0) {
+                    const sharedGoalsResponse = await supabase.from('savings_goals')
+                        .select('*')
+                        .in('id', collaboratorGoalIds);
+                    if (sharedGoalsResponse.error) throw sharedGoalsResponse.error;
+                    sharedSavingsData = sharedGoalsResponse.data || [];
+                }
                 const storedCategories = readStoredCategories(userId);
 
                 const budgetsObj = {};
-                if (budgetsData) {
-                    budgetsData.forEach((b) => {
-                        budgetsObj[b.category_id] = Number(b.limit_amount);
-                    });
-                }
+                budgetsData.forEach((b) => {
+                    budgetsObj[b.category_id] = Number(b.limit_amount);
+                });
 
                 const remoteState = {
-                    wallets: walletsData && walletsData.length > 0
-                        ? walletsData.map(w => ({ id: w.id, name: w.name, color: w.color, initialBalance: Number(w.balance) }))
-                        : seedWallets.map(w => ({ ...w })),
-                    categories: storedCategories ?? seedCategories.map(c => ({ ...c })),
-                    transactions: txnsData ? txnsData.map(t => ({
+                    wallets: walletsData.map(w => ({ id: w.id, name: w.name, color: w.color, initialBalance: Number(w.balance) })),
+                    categories: storedCategories ?? DEFAULT_CATEGORIES.map((category) => ({ ...category })),
+                    transactions: txnsData.map(t => ({
                         id: t.id,
                         title: t.title,
                         amount: Number(t.amount),
@@ -469,9 +428,9 @@ export function FinanceProvider({ children }) {
                         time: t.time,
                         note: t.note,
                         auto: t.auto,
-                    })) : [],
-                    budgets: Object.keys(budgetsObj).length > 0 ? budgetsObj : { ...seedBudgets },
-                    recurringRules: rulesData ? rulesData.map(r => ({
+                    })),
+                    budgets: budgetsObj,
+                    recurringRules: rulesData.map(r => ({
                         id: r.id,
                         title: r.title,
                         amount: Number(r.amount),
@@ -482,8 +441,8 @@ export function FinanceProvider({ children }) {
                         nextDate: r.next_date,
                         active: r.active,
                         anchorDay: Number(recurringMetadata[r.id] || r.anchor_day) || Number(r.next_date?.split('-')[2]) || undefined,
-                    })) : [],
-                    reminders: remindersData ? remindersData.map(r => ({
+                    })),
+                    reminders: remindersData.map(r => ({
                         id: r.id,
                         title: r.title,
                         date: r.date,
@@ -495,8 +454,10 @@ export function FinanceProvider({ children }) {
                         amount: r.amount === null || r.amount === undefined ? null : Number(r.amount),
                         createdAt: r.created_at,
                         updatedAt: r.updated_at
-                    })) : [],
-                    savingsGoals: savingsData ? savingsData.map(g => ({
+                    })),
+                    savingsGoals: [...savingsData, ...sharedSavingsData]
+                        .filter((goal, index, allGoals) => allGoals.findIndex((item) => item.id === goal.id) === index)
+                        .map(g => ({
                         id: g.id,
                         title: g.title,
                         target: Number(g.target),
@@ -505,8 +466,8 @@ export function FinanceProvider({ children }) {
                         history: g.history || [],
                         isShared: g.is_shared,
                         partnerEmail: g.partner_email
-                    })) : [],
-                    invitations: invsData ? invsData.map(inv => ({
+                    })),
+                    invitations: invsData.map(inv => ({
                         id: inv.id,
                         goalId: inv.goal_id,
                         inviterName: inv.inviter_name,
@@ -514,30 +475,41 @@ export function FinanceProvider({ children }) {
                         inviteeEmail: inv.invitee_email,
                         goalTitle: inv.goal_title,
                         status: inv.status
-                    })) : []
+                    }))
                 };
                 const processed = processRecurring(remoteState);
-                if (cancelled) return;
+                if (isStale()) return;
                 setState(processed.state);
+                setStateUserId(userId);
                 try {
-                    await persistRecurringChanges(userId, processed);
-                    if (cancelled) return;
+                    await runRemoteMutation(() => persistRecurringChanges(userId, processed), true);
+                    if (isStale()) return;
                 } catch (error) {
                     try {
                         await rollbackPersistedRecurringChanges(userId, processed);
                     } catch (rollbackError) {
                         console.error('Sakuta: gagal membatalkan transaksi rutin yang tersimpan.', rollbackError);
                     }
-                    if (cancelled) return;
+                    if (isStale()) return;
                     setState(remoteState);
+                    setStateUserId(userId);
                     throw error;
                 }
+                syncSucceeded = true;
             } catch (error) {
-                if (cancelled) return;
+                if (isStale()) return;
                 console.error('Sakuta: gagal memuat data dari Supabase.', error);
                 setSyncError('Data kalender dan tugas tidak dapat dimuat. Periksa koneksi Anda lalu coba lagi.');
+                if (resetRecoveryUserIdRef.current === userId) {
+                    setResetError('Pemulihan data setelah reset gagal. Periksa koneksi Anda lalu coba sinkronisasi lagi.');
+                }
             } finally {
-                if (!cancelled) setSyncLoading(false);
+                if (!isStale()) setSyncLoading(false);
+                if (!isStale() && syncSucceeded && resetRecoveryUserIdRef.current === userId) {
+                    resetRecoveryUserIdRef.current = null;
+                    resetBusyRef.current = false;
+                    setResetBusy(false);
+                }
             }
         };
 
@@ -547,12 +519,6 @@ export function FinanceProvider({ children }) {
         };
     }, [user, syncAttempt]);
 
-    // Process recurring transactions
-    useEffect(() => {
-        if (isSupabaseConfigured && user) return;
-        setState((s) => processRecurring(s).state);
-    }, [user]);
-
     const categoryById = useMemo(() => Object.fromEntries(categories.map((c) => [c.id, c])), [categories]);
     const walletById = useMemo(() => Object.fromEntries(wallets.map((w) => [w.id, w])), [wallets]);
 
@@ -561,7 +527,10 @@ export function FinanceProvider({ children }) {
         [transactions]
     );
 
-    const addTransaction = useCallback(async (data) => {
+    const addTransaction = useCallback((data) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const newId = uid();
         const transaction = { ...data, id: newId };
         setState((s) => ({ ...s, transactions: [transaction, ...s.transactions] }));
@@ -585,13 +554,18 @@ export function FinanceProvider({ children }) {
             return true;
         } catch (error) {
             console.error('Sakuta: gagal menyimpan transaksi.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => ({ ...s, transactions: s.transactions.filter((t) => t.id !== newId) }));
             setSyncError('Transaksi gagal disimpan. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
             return false;
         }
+        });
     }, [user]);
 
-    const updateTransaction = useCallback(async (id, data) => {
+    const updateTransaction = useCallback((id, data) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const previousTransaction = transactions.find((transaction) => transaction.id === id);
         if (!previousTransaction) return false;
         setState((s) => ({ ...s, transactions: s.transactions.map((t) => (t.id === id ? { ...t, ...data } : t)) }));
@@ -616,6 +590,7 @@ export function FinanceProvider({ children }) {
             return true;
         } catch (error) {
             console.error('Sakuta: gagal memperbarui transaksi.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => ({
                 ...s,
                 transactions: s.transactions.map((transaction) => (
@@ -625,9 +600,13 @@ export function FinanceProvider({ children }) {
             setSyncError('Transaksi gagal diperbarui. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
             return false;
         }
+        });
     }, [user, transactions]);
 
-    const deleteTransaction = useCallback(async (id) => {
+    const deleteTransaction = useCallback((id) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const previousTransaction = transactions.find((transaction) => transaction.id === id);
         if (!previousTransaction) return false;
         setState((s) => ({ ...s, transactions: s.transactions.filter((t) => t.id !== id) }));
@@ -645,13 +624,18 @@ export function FinanceProvider({ children }) {
             return true;
         } catch (error) {
             console.error('Sakuta: gagal menghapus transaksi.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => ({ ...s, transactions: [...s.transactions, previousTransaction] }));
             setSyncError('Transaksi gagal dihapus. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
             return false;
         }
+        });
     }, [user, transactions]);
 
-    const addTransfer = useCallback(async ({ fromWalletId, toWalletId, amount, title, date, time, note }) => {
+    const addTransfer = useCallback(({ fromWalletId, toWalletId, amount, title, date, time, note }) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const newId = uid();
         const newTx = {
             id: newId,
@@ -685,13 +669,18 @@ export function FinanceProvider({ children }) {
             return true;
         } catch (error) {
             console.error('Sakuta: gagal menyimpan transfer.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => ({ ...s, transactions: s.transactions.filter((transaction) => transaction.id !== newId) }));
             setSyncError('Transfer gagal disimpan. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
             return false;
         }
+        });
     }, [user]);
 
-    const addWallet = useCallback(async ({ name, color, initialBalance }) => {
+    const addWallet = useCallback(({ name, color, initialBalance }) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const newId = uid();
         const wallet = {
             id: newId,
@@ -715,13 +704,18 @@ export function FinanceProvider({ children }) {
             return true;
         } catch (error) {
             console.error('Sakuta: gagal menyimpan dompet.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => ({ ...s, wallets: s.wallets.filter((item) => item.id !== newId) }));
             setSyncError('Dompet gagal disimpan. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
             return false;
         }
+        });
     }, [user]);
 
-    const updateWallet = useCallback(async (id, data) => {
+    const updateWallet = useCallback((id, data) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const previousWallet = wallets.find((wallet) => wallet.id === id);
         if (!previousWallet) return false;
         setState((s) => ({
@@ -751,6 +745,7 @@ export function FinanceProvider({ children }) {
             return true;
         } catch (error) {
             console.error('Sakuta: gagal memperbarui dompet.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => ({
                 ...s,
                 wallets: s.wallets.map((wallet) => wallet.id === id ? previousWallet : wallet),
@@ -758,9 +753,13 @@ export function FinanceProvider({ children }) {
             setSyncError('Dompet gagal diperbarui. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
             return false;
         }
+        });
     }, [user, wallets]);
 
-    const deleteWallet = useCallback(async (id) => {
+    const deleteWallet = useCallback((id) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const previousWallet = wallets.find((wallet) => wallet.id === id);
         if (!previousWallet) return false;
         setState((s) => ({
@@ -781,13 +780,16 @@ export function FinanceProvider({ children }) {
             return true;
         } catch (error) {
             console.error('Sakuta: gagal menghapus dompet.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => ({ ...s, wallets: [...s.wallets, previousWallet] }));
             setSyncError('Dompet gagal dihapus. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
             return false;
         }
+        });
     }, [user, wallets]);
 
     const addCategory = useCallback(({ name, type, iconKey, budget }) => {
+        if (resetBusyRef.current) return false;
         const palette = ['#B45309', '#2563EB', '#9333EA', '#E11D48', '#059669', '#0F766E', '#475569'];
         const badgePalette = [
             'bg-amber-50 text-amber-700 border border-amber-100',
@@ -818,6 +820,7 @@ export function FinanceProvider({ children }) {
     }, [user, categories]);
 
     const updateCategory = useCallback((id, data) => {
+        if (resetBusyRef.current) return false;
         const nextCategories = categories.map((category) => (category.id === id ? {
             ...category,
             name: data.name ?? category.name,
@@ -837,6 +840,7 @@ export function FinanceProvider({ children }) {
     }, [user, categories]);
 
     const deleteCategory = useCallback((id) => {
+        if (resetBusyRef.current) return false;
         const nextCategories = categories.filter((category) => category.id !== id);
         if (isSupabaseConfigured && user) writeStoredCategories(user.id, nextCategories);
         setState((s) => {
@@ -851,7 +855,10 @@ export function FinanceProvider({ children }) {
         });
     }, [user, categories]);
 
-    const setBudget = useCallback(async (categoryId, limit) => {
+    const setBudget = useCallback((categoryId, limit) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const previousBudget = budgets[categoryId];
         setState((s) => {
             const budgetsNext = { ...s.budgets };
@@ -881,6 +888,7 @@ export function FinanceProvider({ children }) {
             return true;
         } catch (error) {
             console.error('Sakuta: gagal menyimpan anggaran kategori.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => {
                 const budgetsNext = { ...s.budgets };
                 if (previousBudget === undefined) delete budgetsNext[categoryId];
@@ -890,9 +898,13 @@ export function FinanceProvider({ children }) {
             setSyncError('Anggaran gagal disimpan. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
             return false;
         }
+        });
     }, [user, budgets]);
 
-    const addRecurringRule = useCallback(async (data) => {
+    const addRecurringRule = useCallback((data) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const newId = uid();
         const anchorDay = data.frequency === 'monthly' ? Number(data.nextDate.split('-')[2]) : undefined;
         const rule = {
@@ -924,14 +936,16 @@ export function FinanceProvider({ children }) {
             if (error) throw error;
             return true;
         } catch (error) {
+            if (!operationIsCurrent(operation)) return false;
             let persistedRule = null;
             try {
-                const response = await supabase.from('recurring_rules')
-                    .select('id')
-                    .eq('id', newId)
-                    .eq('user_id', user.id)
-                    .maybeSingle();
+                        const response = await supabase.from('recurring_rules')
+                            .select('id')
+                            .eq('id', newId)
+                            .eq('user_id', user.id)
+                            .maybeSingle();
                 persistedRule = response.data;
+                if (!operationIsCurrent(operation)) return false;
             } catch (lookupError) {
                 console.error('Sakuta: gagal memverifikasi aturan rutin.', lookupError);
             }
@@ -942,11 +956,15 @@ export function FinanceProvider({ children }) {
             setCalendarError('Aturan rutin gagal disimpan. Periksa koneksi Anda lalu coba lagi.');
             return false;
         } finally {
-            setCalendarOperation(null);
+            if (operationIsCurrent(operation)) setCalendarOperation(null);
         }
+        });
     }, [user]);
 
-    const toggleRecurringRule = useCallback(async (id) => {
+    const toggleRecurringRule = useCallback((id) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const previousRule = recurringRules.find((rule) => rule.id === id);
         if (!previousRule) return false;
         const activeNext = !previousRule.active;
@@ -983,6 +1001,7 @@ export function FinanceProvider({ children }) {
             return true;
         } catch (error) {
             console.error('Sakuta: gagal mengubah status aturan rutin.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => ({
                     ...s,
                     recurringRules: s.recurringRules.map((rule) => (
@@ -992,11 +1011,15 @@ export function FinanceProvider({ children }) {
             setCalendarError('Status aturan rutin gagal disimpan. Periksa koneksi Anda lalu coba lagi.');
             return false;
         } finally {
-            setCalendarOperation(null);
+            if (operationIsCurrent(operation)) setCalendarOperation(null);
         }
+        });
     }, [user, recurringRules]);
 
-    const deleteRecurringRule = useCallback(async (id) => {
+    const deleteRecurringRule = useCallback((id) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const previousIndex = recurringRules.findIndex((rule) => rule.id === id);
         const previousRule = previousIndex >= 0 ? recurringRules[previousIndex] : null;
         if (!previousRule) return false;
@@ -1019,6 +1042,7 @@ export function FinanceProvider({ children }) {
             return true;
         } catch (error) {
             console.error('Sakuta: gagal menghapus aturan rutin.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => {
                 if (s.recurringRules.some((rule) => rule.id === id)) return s;
                 const rules = [...s.recurringRules];
@@ -1028,11 +1052,15 @@ export function FinanceProvider({ children }) {
             setCalendarError('Aturan rutin gagal dihapus. Periksa koneksi Anda lalu coba lagi.');
             return false;
         } finally {
-            setCalendarOperation(null);
+            if (operationIsCurrent(operation)) setCalendarOperation(null);
         }
+        });
     }, [user, recurringRules]);
 
-    const addReminder = useCallback(async (data) => {
+    const addReminder = useCallback((data) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const newId = uid();
         const reminder = {
             id: newId,
@@ -1070,6 +1098,7 @@ export function FinanceProvider({ children }) {
             if (error) throw error;
             return true;
         } catch (error) {
+            if (!operationIsCurrent(operation)) return false;
             let persistedReminder = null;
             try {
                 const response = await supabase.from('reminders')
@@ -1078,6 +1107,7 @@ export function FinanceProvider({ children }) {
                     .eq('user_id', user.id)
                     .maybeSingle();
                 persistedReminder = response.data;
+                if (!operationIsCurrent(operation)) return false;
             } catch (lookupError) {
                 console.error('Sakuta: gagal memverifikasi pengingat.', lookupError);
             }
@@ -1087,11 +1117,15 @@ export function FinanceProvider({ children }) {
             setCalendarError('Pengingat gagal disimpan. Periksa koneksi Anda lalu coba lagi.');
             return false;
         } finally {
-            setCalendarOperation(null);
+            if (operationIsCurrent(operation)) setCalendarOperation(null);
         }
+        });
     }, [user]);
 
-    const updateReminder = useCallback(async (id, data) => {
+    const updateReminder = useCallback((id, data) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const previousReminder = reminders.find((reminder) => reminder.id === id);
         if (!previousReminder) return false;
         const changes = {
@@ -1134,6 +1168,7 @@ export function FinanceProvider({ children }) {
             return true;
         } catch (error) {
             console.error('Sakuta: gagal memperbarui pengingat.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => ({
                 ...s,
                 reminders: (s.reminders || []).map((reminder) => (
@@ -1143,11 +1178,15 @@ export function FinanceProvider({ children }) {
             setCalendarError('Pengingat gagal diperbarui. Periksa koneksi Anda lalu coba lagi.');
             return false;
         } finally {
-            setCalendarOperation(null);
+            if (operationIsCurrent(operation)) setCalendarOperation(null);
         }
+        });
     }, [user, reminders]);
 
-    const toggleReminder = useCallback(async (id) => {
+    const toggleReminder = useCallback((id) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const previousReminder = reminders.find((reminder) => reminder.id === id);
         if (!previousReminder) return false;
         const isCompletedNext = !previousReminder.isCompleted;
@@ -1174,6 +1213,7 @@ export function FinanceProvider({ children }) {
             return true;
         } catch (error) {
             console.error('Sakuta: gagal mengubah status pengingat.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => ({
                 ...s,
                 reminders: (s.reminders || []).map((reminder) => (
@@ -1183,11 +1223,15 @@ export function FinanceProvider({ children }) {
             setCalendarError('Status pengingat gagal disimpan. Periksa koneksi Anda lalu coba lagi.');
             return false;
         } finally {
-            setCalendarOperation(null);
+            if (operationIsCurrent(operation)) setCalendarOperation(null);
         }
+        });
     }, [user, reminders]);
 
-    const deleteReminder = useCallback(async (id) => {
+    const deleteReminder = useCallback((id) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const previousIndex = reminders.findIndex((reminder) => reminder.id === id);
         const previousReminder = previousIndex >= 0 ? reminders[previousIndex] : null;
         if (!previousReminder) return false;
@@ -1209,6 +1253,7 @@ export function FinanceProvider({ children }) {
             return true;
         } catch (error) {
             console.error('Sakuta: gagal menghapus pengingat.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => {
                 if ((s.reminders || []).some((reminder) => reminder.id === id)) return s;
                 const nextReminders = [...(s.reminders || [])];
@@ -1218,11 +1263,15 @@ export function FinanceProvider({ children }) {
             setCalendarError('Pengingat gagal dihapus. Periksa koneksi Anda lalu coba lagi.');
             return false;
         } finally {
-            setCalendarOperation(null);
+            if (operationIsCurrent(operation)) setCalendarOperation(null);
         }
+        });
     }, [user, reminders]);
 
-    const addSavingsGoal = useCallback(async (data) => {
+    const addSavingsGoal = useCallback((data) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const newId = uid();
         const history = data.current > 0 ? [{ id: uid(), date: todayISO(), amount: data.current, note: 'Saldo Awal' }] : [];
         const goal = { ...data, id: newId, history };
@@ -1244,13 +1293,18 @@ export function FinanceProvider({ children }) {
             return true;
         } catch (error) {
             console.error('Sakuta: gagal menyimpan target tabungan.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => ({ ...s, savingsGoals: s.savingsGoals.filter((item) => item.id !== newId) }));
             setSyncError('Target tabungan gagal disimpan. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
             return false;
         }
+        });
     }, [user]);
 
-    const deleteSavingsGoal = useCallback(async (id) => {
+    const deleteSavingsGoal = useCallback((id) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const previousGoal = savingsGoals.find((goal) => goal.id === id);
         if (!previousGoal) return false;
         setState((s) => ({ ...s, savingsGoals: s.savingsGoals.filter((g) => g.id !== id) }));
@@ -1268,13 +1322,18 @@ export function FinanceProvider({ children }) {
             return true;
         } catch (error) {
             console.error('Sakuta: gagal menghapus target tabungan.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => ({ ...s, savingsGoals: [...s.savingsGoals, previousGoal] }));
             setSyncError('Target tabungan gagal dihapus. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
             return false;
         }
+        });
     }, [user, savingsGoals]);
 
-    const addSavingsGoalDeposit = useCallback(async (goalId, deposit) => {
+    const addSavingsGoalDeposit = useCallback((goalId, deposit) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const previousGoal = savingsGoals.find((goal) => goal.id === goalId);
         if (!previousGoal) return false;
         const newDeposit = { ...deposit, id: uid() };
@@ -1292,15 +1351,15 @@ export function FinanceProvider({ children }) {
         if (!isSupabaseConfigured || !user) return true;
 
         try {
-            const { data: updatedGoals, error } = await supabase.from('savings_goals').update({
+            const updatedGoals = await updateSavingsGoalForUser(goalId, user.id, {
                 current: goalNext.current,
                 history: goalNext.history
-            }).eq('id', goalId).select('id');
-            if (error) throw error;
+            });
             if (!updatedGoals || updatedGoals.length === 0) throw new Error('Target tabungan tidak ditemukan atau tidak dapat diakses.');
             return true;
         } catch (error) {
             console.error('Sakuta: gagal menyimpan setoran target tabungan.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => ({
                 ...s,
                 savingsGoals: s.savingsGoals.map((goal) => goal.id === goalId ? previousGoal : goal),
@@ -1308,9 +1367,13 @@ export function FinanceProvider({ children }) {
             setSyncError('Setoran target tabungan gagal disimpan. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
             return false;
         }
+        });
     }, [user, savingsGoals]);
 
-    const deleteSavingsGoalDeposit = useCallback(async (goalId, depositId) => {
+    const deleteSavingsGoalDeposit = useCallback((goalId, depositId) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const previousGoal = savingsGoals.find((goal) => goal.id === goalId);
         if (!previousGoal) return false;
         const depositToDelete = (previousGoal.history || []).find((deposit) => deposit.id === depositId);
@@ -1329,15 +1392,15 @@ export function FinanceProvider({ children }) {
         if (!isSupabaseConfigured || !user) return true;
 
         try {
-            const { data: updatedGoals, error } = await supabase.from('savings_goals').update({
+            const updatedGoals = await updateSavingsGoalForUser(goalId, user.id, {
                 current: goalNext.current,
                 history: goalNext.history
-            }).eq('id', goalId).select('id');
-            if (error) throw error;
+            });
             if (!updatedGoals || updatedGoals.length === 0) throw new Error('Target tabungan tidak ditemukan atau tidak dapat diakses.');
             return true;
         } catch (error) {
             console.error('Sakuta: gagal menghapus setoran target tabungan.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => ({
                 ...s,
                 savingsGoals: s.savingsGoals.map((goal) => goal.id === goalId ? previousGoal : goal),
@@ -1345,9 +1408,13 @@ export function FinanceProvider({ children }) {
             setSyncError('Setoran target tabungan gagal dihapus. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
             return false;
         }
+        });
     }, [user, savingsGoals]);
 
-    const updateSavingsGoalSharing = useCallback(async (goalId, partnerEmail) => {
+    const updateSavingsGoalSharing = useCallback((goalId, partnerEmail) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const isShared = !!partnerEmail;
         const previousGoal = savingsGoals.find((goal) => goal.id === goalId);
         if (!previousGoal) return false;
@@ -1362,22 +1429,14 @@ export function FinanceProvider({ children }) {
             if (!isSupabaseConfigured || !user) return true;
 
             try {
-                const { data: updatedGoals, error: goalError } = await supabase.from('savings_goals')
-                    .update({ is_shared: false, partner_email: null })
-                    .eq('id', goalId)
-                    .eq('user_id', user.id)
-                    .select('id');
-                if (goalError) throw goalError;
-                if (!updatedGoals || updatedGoals.length === 0) throw new Error('Target tabungan tidak ditemukan atau tidak dapat diakses.');
-
-                const { error: invitationError } = await supabase.from('savings_goal_invitations')
-                    .delete()
-                    .eq('goal_id', goalId)
-                    .eq('inviter_email', user.email);
-                if (invitationError) throw invitationError;
+                const { error } = await supabase.rpc('stop_savings_goal_sharing', {
+                    p_goal_id: goalId,
+                });
+                if (error) throw error;
                 return true;
             } catch (error) {
                 console.error('Sakuta: gagal menghentikan kolaborasi target tabungan.', error);
+                if (!operationIsCurrent(operation)) return false;
                 setState((s) => ({
                     ...s,
                     savingsGoals: s.savingsGoals.map((goal) => goal.id === goalId ? {
@@ -1396,20 +1455,35 @@ export function FinanceProvider({ children }) {
             id: uid(),
             goalId,
             inviterName: user ? user.name : 'Pasangan',
-            inviterEmail: user ? user.email : 'pasangan@email.com',
+            inviterEmail: activeUserEmail || 'pasangan@email.com',
             inviteeEmail: partnerEmail.trim().toLowerCase(),
             goalTitle: savingsGoals.find(g => g.id === goalId)?.title || 'Target Bersama',
             status: 'pending'
         };
+        let goalSharingUpdated = false;
 
         setState((s) => ({
             ...s,
+            savingsGoals: s.savingsGoals.map((goal) => (
+                goal.id === goalId
+                    ? { ...goal, isShared: true, partnerEmail: newInv.inviteeEmail }
+                    : goal
+            )),
             invitations: [...(s.invitations || []), newInv]
         }));
 
         if (!isSupabaseConfigured || !user) return true;
 
         try {
+            const { data: updatedGoals, error: goalError } = await supabase.from('savings_goals')
+                .update({ is_shared: true, partner_email: newInv.inviteeEmail })
+                .eq('id', goalId)
+                .eq('user_id', user.id)
+                .select('id');
+            if (goalError) throw goalError;
+            if (!updatedGoals || updatedGoals.length === 0) throw new Error('Target tabungan tidak ditemukan atau tidak dapat diakses.');
+            goalSharingUpdated = true;
+
             const { error } = await supabase.from('savings_goal_invitations').insert([{
                 id: newInv.id,
                 goal_id: newInv.goalId,
@@ -1423,52 +1497,62 @@ export function FinanceProvider({ children }) {
             return true;
         } catch (error) {
             console.error('Sakuta: gagal mengirim undangan kolaborasi.', error);
-            setState((s) => ({ ...s, invitations: (s.invitations || []).filter((inv) => inv.id !== newInv.id) }));
+            if (goalSharingUpdated) {
+                try {
+                    const { error: goalRollbackError } = await supabase.from('savings_goals')
+                        .update({ is_shared: Boolean(previousGoal.isShared), partner_email: previousGoal.partnerEmail || null })
+                        .eq('id', goalId)
+                        .eq('user_id', user.id);
+                    if (goalRollbackError) throw goalRollbackError;
+                } catch (rollbackError) {
+                    console.error('Sakuta: gagal membatalkan status berbagi target tabungan.', rollbackError);
+                }
+            }
+            if (!operationIsCurrent(operation)) return false;
+            setState((s) => ({
+                ...s,
+                savingsGoals: s.savingsGoals.map((goal) => goal.id === goalId ? previousGoal : goal),
+                invitations: (s.invitations || []).filter((inv) => inv.id !== newInv.id),
+            }));
             setSyncError('Undangan kolaborasi gagal dikirim. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
             return false;
         }
+        });
     }, [user, savingsGoals]);
 
-    const acceptSavingsGoalInvitation = useCallback(async (invitationId) => {
+    const acceptSavingsGoalInvitation = useCallback((invitationId) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const invitation = invitations.find((inv) => inv.id === invitationId);
         if (!invitation) return false;
         const alreadyExists = savingsGoals.some((goal) => goal.id === invitation.goalId);
-        const newGoal = {
-            id: invitation.goalId,
-            title: invitation.goalTitle,
-            target: 100000000,
-            current: 25000000,
-            deadlineISO: todayISO(),
-            history: [
-                { id: uid(), date: todayISO(), amount: 25000000, note: 'Saldo Awal Mulai Bersama', senderName: invitation.inviterName }
-            ],
-            isShared: true,
-            partnerEmail: invitation.inviterEmail
-        };
 
         setState((s) => ({
             ...s,
             invitations: (s.invitations || []).map((inv) => (
                 inv.id === invitationId ? { ...inv, status: 'accepted' } : inv
             )),
-            savingsGoals: alreadyExists ? s.savingsGoals : [...s.savingsGoals, newGoal],
         }));
 
         if (!isSupabaseConfigured || !user) return true;
 
+        let invitationAcceptedRemotely = false;
+        let collaboratorInserted = false;
         try {
             const { data: updatedInvitations, error: invitationUpdateError } = await supabase.from('savings_goal_invitations')
                 .update({ status: 'accepted' })
                 .eq('id', invitationId)
-                .eq('invitee_email', user.email)
+                .eq('invitee_email', activeUserEmail)
                 .select('id');
             if (invitationUpdateError) throw invitationUpdateError;
             if (!updatedInvitations || updatedInvitations.length === 0) throw new Error('Undangan kolaborasi tidak ditemukan atau tidak dapat diakses.');
+            invitationAcceptedRemotely = true;
 
             const { data: inv, error: invitationReadError } = await supabase.from('savings_goal_invitations')
                 .select('*')
                 .eq('id', invitationId)
-                .eq('invitee_email', user.email)
+                .eq('invitee_email', activeUserEmail)
                 .single();
             if (invitationReadError) throw invitationReadError;
             if (!inv) throw new Error('Undangan kolaborasi tidak ditemukan.');
@@ -1478,9 +1562,54 @@ export function FinanceProvider({ children }) {
                 user_id: user.id
             }]);
             if (collaboratorError) throw collaboratorError;
+            collaboratorInserted = true;
+
+            const { data: sharedGoal, error: sharedGoalError } = await supabase.from('savings_goals')
+                .select('*')
+                .eq('id', inv.goal_id)
+                .maybeSingle();
+            if (sharedGoalError) throw sharedGoalError;
+            if (!sharedGoal) throw new Error('Target kolaborasi tidak ditemukan.');
+
+            const acceptedGoal = {
+                id: sharedGoal.id,
+                title: sharedGoal.title,
+                target: Number(sharedGoal.target),
+                current: Number(sharedGoal.current),
+                deadlineISO: sharedGoal.deadline_iso,
+                history: sharedGoal.history || [],
+                isShared: true,
+                partnerEmail: sharedGoal.partner_email || invitation.inviterEmail,
+            };
+            if (!operationIsCurrent(operation)) throw new Error('Sesi pengguna berubah saat menerima undangan.');
+            setState((s) => ({
+                ...s,
+                savingsGoals: alreadyExists
+                    ? s.savingsGoals.map((goal) => goal.id === acceptedGoal.id ? acceptedGoal : goal)
+                    : [...s.savingsGoals, acceptedGoal],
+            }));
             return true;
         } catch (error) {
             console.error('Sakuta: gagal menerima undangan kolaborasi.', error);
+            try {
+                if (collaboratorInserted) {
+                    const { error: collaboratorRollbackError } = await supabase.from('savings_goal_collaborators')
+                        .delete()
+                        .eq('savings_goal_id', invitation.goalId)
+                        .eq('user_id', user.id);
+                    if (collaboratorRollbackError) throw collaboratorRollbackError;
+                }
+                if (invitationAcceptedRemotely) {
+                    const { error: invitationRollbackError } = await supabase.from('savings_goal_invitations')
+                        .update({ status: 'pending' })
+                        .eq('id', invitationId)
+                        .eq('invitee_email', activeUserEmail);
+                    if (invitationRollbackError) throw invitationRollbackError;
+                }
+            } catch (rollbackError) {
+                console.error('Sakuta: gagal membatalkan penerimaan undangan kolaborasi.', rollbackError);
+            }
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => ({
                 ...s,
                 invitations: (s.invitations || []).map((inv) => inv.id === invitationId ? invitation : inv),
@@ -1491,9 +1620,13 @@ export function FinanceProvider({ children }) {
             setSyncError('Undangan kolaborasi gagal diterima. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
             return false;
         }
+        });
     }, [user, invitations, savingsGoals]);
 
-    const rejectSavingsGoalInvitation = useCallback(async (invitationId) => {
+    const rejectSavingsGoalInvitation = useCallback((invitationId) => {
+        if (resetBusyRef.current) return false;
+        return runRemoteMutation(async () => {
+            const operation = captureOperation();
         const invitation = invitations.find((inv) => inv.id === invitationId);
         if (!invitation) return false;
         setState((s) => ({
@@ -1507,45 +1640,78 @@ export function FinanceProvider({ children }) {
             const { data: deletedInvitations, error } = await supabase.from('savings_goal_invitations')
                 .delete()
                 .eq('id', invitationId)
-                .eq('invitee_email', user.email)
+                .eq('invitee_email', activeUserEmail)
                 .select('id');
             if (error) throw error;
             if (!deletedInvitations || deletedInvitations.length === 0) throw new Error('Undangan kolaborasi tidak ditemukan atau tidak dapat diakses.');
             return true;
         } catch (error) {
             console.error('Sakuta: gagal menolak undangan kolaborasi.', error);
+            if (!operationIsCurrent(operation)) return false;
             setState((s) => ({ ...s, invitations: [...(s.invitations || []), invitation] }));
             setSyncError('Undangan kolaborasi gagal ditolak. Periksa koneksi dan izin Supabase Anda lalu coba lagi.');
             return false;
         }
+        });
     }, [user, invitations]);
 
     const resetData = useCallback(async () => {
+        if (resetBusyRef.current) return false;
+        resetBusyRef.current = true;
+        setResetBusy(true);
+        let recoveryRequired = false;
         setCalendarError('');
-        if (isSupabaseConfigured && user) {
-            const userId = user.id;
-            try {
-                const responses = await Promise.all([
-                    supabase.from('transactions').delete().eq('user_id', userId),
-                    supabase.from('wallets').delete().eq('user_id', userId),
-                    supabase.from('category_budgets').delete().eq('user_id', userId),
-                    supabase.from('savings_goals').delete().eq('user_id', userId),
-                    supabase.from('recurring_rules').delete().eq('user_id', userId),
-                    supabase.from('reminders').delete().eq('user_id', userId),
-                    supabase.from('savings_goal_invitations').delete().or(`inviter_email.eq.${user.email},invitee_email.eq.${user.email}`),
-                ]);
-                const responseError = responses.find((response) => response.error)?.error;
-                if (responseError) throw responseError;
-            } catch (error) {
-                console.error('Sakuta: gagal mereset data.', error);
-                setCalendarError('Data belum berhasil direset. Periksa koneksi Anda lalu coba lagi.');
-                return false;
+        setCalendarOperation(null);
+        setResetError('');
+        syncRequestRef.current += 1;
+        operationEpochRef.current += 1;
+        const resetUserId = user?.id || null;
+        const resetEpoch = operationEpochRef.current;
+        setState(createFreshFinanceState());
+        setStateUserId(null);
+
+        try {
+            if (isSupabaseConfigured && user) {
+                await waitForRemoteMutations();
+                const { error } = await supabase.rpc('reset_user_finance_data', {
+                    p_user_id: user.id,
+                    p_email: activeUserEmail,
+                });
+                if (error) throw error;
+            }
+
+            if (user) {
+                localStorage.removeItem(STORAGE_KEY);
+                localStorage.removeItem(financeStorageKey(user.id));
+                localStorage.removeItem(categoryStorageKey(user.id));
+                clearRecurringMetadata(user.id);
+            }
+        } catch (error) {
+            console.error('Sakuta: gagal mereset data.', error);
+            if (
+                activeUserIdRef.current === resetUserId
+                && operationEpochRef.current === resetEpoch
+            ) {
+                setResetError('Data belum berhasil direset. Periksa koneksi Anda lalu coba lagi.');
+            }
+            if (isSupabaseConfigured && resetUserId && activeUserIdRef.current === resetUserId) {
+                recoveryRequired = true;
+                resetRecoveryUserIdRef.current = resetUserId;
+                setSyncAttempt((attempt) => attempt + 1);
+            }
+            return false;
+        } finally {
+            if (!recoveryRequired) {
+                resetBusyRef.current = false;
+                setResetBusy(false);
             }
         }
 
-        localStorage.removeItem(STORAGE_KEY);
-        if (user) localStorage.removeItem(categoryStorageKey(user.id));
-        setState(seedState());
+        if (activeUserIdRef.current !== resetUserId || operationEpochRef.current !== resetEpoch) return true;
+        setState(createFreshFinanceState());
+        setStateUserId(resetUserId);
+        setSyncLoading(false);
+        setSyncError('');
         return true;
     }, [user]);
 
@@ -1650,6 +1816,9 @@ export function FinanceProvider({ children }) {
         syncLoading,
         syncError,
         retrySync,
+        resetBusy,
+        resetError,
+        clearResetError,
         calendarBusy,
         calendarError,
         clearCalendarError,
@@ -1663,7 +1832,7 @@ export function FinanceProvider({ children }) {
         addSavingsGoal, deleteSavingsGoal, addSavingsGoalDeposit, deleteSavingsGoalDeposit,
         updateSavingsGoalSharing, acceptSavingsGoalInvitation, rejectSavingsGoalInvitation, resetData,
         getWalletBalance, totalBalance, monthStats, getCategoryMonthSpend, getCategoryMonthCount, getBudgetAlerts,
-        syncLoading, syncError, retrySync, calendarBusy, calendarError, clearCalendarError,
+        syncLoading, syncError, retrySync, resetBusy, resetError, clearResetError, calendarBusy, calendarError, clearCalendarError,
     ]);
 
     return <FinanceContext.Provider value={value}>{children}</FinanceContext.Provider>;
